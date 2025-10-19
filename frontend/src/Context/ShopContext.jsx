@@ -4,29 +4,20 @@ import { API_BASE_URL, resolveImageUrl } from '../config'
 
 export const ShopContext = createContext(null)
 
-const buildCartFromProducts = (products, previousCart = {}) => {
-  const cart = {}
-  products.forEach((product) => {
-    cart[product.id] = previousCart[product.id] || 0
-  })
-  return cart
-}
-
 const ShopContextProvider = (props) => {
   const [products, setProducts] = useState(fallbackProducts)
-  const [cartItems, setCartItems] = useState(() =>
-    buildCartFromProducts(fallbackProducts)
-  )
+  const [cartItems, setCartItems] = useState({})
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [error, setError] = useState('')
+
+  const [userName, setUserName] = useState(localStorage.getItem('user_name'));
+
 
   const fetchProducts = useCallback(async () => {
     setLoadingProducts(true)
     try {
       const response = await fetch(`${API_BASE_URL}/allproducts`)
-      if (!response.ok) {
-        throw new Error('Không thể tải danh sách sản phẩm.')
-      }
+      if (!response.ok) throw new Error('Không thể tải danh sách sản phẩm.')
       const data = await response.json()
       if (Array.isArray(data) && data.length > 0) {
         const normalizedProducts = data.map((product) => ({
@@ -34,23 +25,13 @@ const ShopContextProvider = (props) => {
           image: resolveImageUrl(product.image)
         }))
         setProducts(normalizedProducts)
-        setCartItems((previous) =>
-          buildCartFromProducts(normalizedProducts, previous)
-        )
         setError('')
       } else {
         setProducts(fallbackProducts)
-        setCartItems((previous) =>
-          buildCartFromProducts(fallbackProducts, previous)
-        )
         setError('Không có sản phẩm từ máy chủ, sử dụng dữ liệu mặc định.')
       }
     } catch (err) {
-      console.error('Failed to load products', err)
       setProducts(fallbackProducts)
-      setCartItems((previous) =>
-        buildCartFromProducts(fallbackProducts, previous)
-      )
       setError('Không thể tải sản phẩm mới, sử dụng dữ liệu cục bộ.')
     } finally {
       setLoadingProducts(false)
@@ -61,29 +42,34 @@ const ShopContextProvider = (props) => {
     fetchProducts()
   }, [fetchProducts])
 
-  const addToCart = (itemId) => {
+  // Thêm sản phẩm với size
+  const addToCart = (itemId, size) => {
+    if (!size) {
+      alert('Vui lòng chọn size trước khi thêm vào giỏ hàng!')
+      return
+    }
+    const key = `${itemId}-${size}`
+    setCartItems((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }))
+  }
+
+  // Xóa theo size
+  const removeFromCart = (itemId, size) => {
+    const key = `${itemId}-${size}`
     setCartItems((prev) => {
-      if (!(itemId in prev)) return prev
-      return { ...prev, [itemId]: prev[itemId] + 1 }
+      if (!(key in prev)) return prev
+      const nextValue = Math.max(prev[key] - 1, 0)
+      return { ...prev, [key]: nextValue }
     })
   }
 
-  const removeFromCart = (itemId) => {
-    setCartItems((prev) => {
-      if (!(itemId in prev)) return prev
-      const nextValue = Math.max(prev[itemId] - 1, 0)
-      return { ...prev, [itemId]: nextValue }
-    })
-  }
-
+  // Tổng tiền (tính từng biến thể sản phẩm)
   const getTotalCartAmount = () => {
     let totalAmount = 0
-    for (const itemId in cartItems) {
-      const quantity = cartItems[itemId]
+    for (const key in cartItems) {
+      const quantity = cartItems[key]
       if (quantity > 0) {
-        const itemInfo = products.find(
-          (product) => product.id === Number(itemId)
-        )
+        const [id] = key.split('-')
+        const itemInfo = products.find((product) => product.id === Number(id))
         if (itemInfo) {
           totalAmount += itemInfo.new_price * quantity
         }
@@ -92,10 +78,11 @@ const ShopContextProvider = (props) => {
     return totalAmount
   }
 
+  // Tổng số sản phẩm trong giỏ hàng
   const getTotalCartItems = () => {
     let totalItem = 0
-    for (const itemId in cartItems) {
-      totalItem += cartItems[itemId]
+    for (const key in cartItems) {
+      totalItem += cartItems[key]
     }
     return totalItem
   }

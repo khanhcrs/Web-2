@@ -18,6 +18,7 @@ const CartItems = () => {
       <div className='cartitems-format-main'>
         <p>Products</p>
         <p>Title</p>
+        <p>Size</p>
         <p>Price</p>
         <p>Quantity</p>
         <p>Total</p>
@@ -25,11 +26,16 @@ const CartItems = () => {
       </div>
       <hr />
       {loadingProducts && <p className='cartitems-loading'>Đang tải sản phẩm...</p>}
+
       {!loadingProducts &&
-        products.map((product) => {
-          if (cartItems[product.id] > 0) {
+        Object.entries(cartItems).map(([key, quantity]) => {
+          if (quantity > 0) {
+            const [productId, size] = key.split('-')
+            const product = products.find(p => p.id === Number(productId))
+            if (!product) return null
+
             return (
-              <div key={product.id}>
+              <div key={key}>
                 <div className='cartiems-format cartitems-format-main'>
                   <img
                     src={resolveImageUrl(product.image)}
@@ -37,17 +43,17 @@ const CartItems = () => {
                     className='carticon-product-icon'
                   />
                   <p>{product.name}</p>
+                  <p>{size}</p>
                   <p>{product.new_price}đ</p>
                   <button className='cartitems-quantity'>
-                    {cartItems[product.id]}
+                    {quantity}
                   </button>
-                  <p>{product.new_price * cartItems[product.id]}đ</p>
+                  <p>{product.new_price * quantity}đ</p>
                   <img
                     src={remove_icon}
-                    onClick={() => {
-                      removeFromCart(product.id)
-                    }}
+                    onClick={() => removeFromCart(product.id, size)}
                     alt='Xoá khỏi giỏ'
+                    style={{ cursor: 'pointer' }}
                   />
                 </div>
                 <hr />
@@ -55,7 +61,9 @@ const CartItems = () => {
             )
           }
           return null
-        })}
+        })
+      }
+
       <div className='cartitems-down'>
         <div className='cartitems-total'>
           <h1>Cart Total</h1>

@@ -1,19 +1,27 @@
-import React, { useContext } from 'react'
+import React, { useContext, useState } from 'react'
 import './ProductDisplay.css'
 import star_icon from '../assests/star_icon.png'
 import star_dull_icon from '../assests/star_dull_icon.png'
 import { ShopContext } from '../../Context/ShopContext'
 import { resolveImageUrl } from '../../config'
 
-const ProductDisplay = (props) => {
+const SIZES = ["S", "M", "L", "XL", "XXL"];
 
+const ProductDisplay = (props) => {
     const { product } = props;
     const { addToCart } = useContext(ShopContext);
     const productImage = resolveImageUrl(product?.image);
+    const [selectedSize, setSelectedSize] = useState(null);
 
-    if (!product) {
-        return null;
-    }
+    if (!product) return null;
+
+    const handleAddToCart = () => {
+        if (!selectedSize) {
+            alert("Vui lòng chọn size trước khi thêm vào giỏ hàng!");
+            return;
+        }
+        addToCart(product.id, selectedSize);
+    };
 
     return (
         <div className='productdisplay'>
@@ -42,23 +50,24 @@ const ProductDisplay = (props) => {
                     <div className="productdisplay-right-price-old">{product.old_price}đ</div>
                     <div className="productdisplay-right-price-new">{product.new_price}đ</div>
                 </div>
-                <div className="productdisplay-right-description">
-
-                </div>
                 <div className="productdisplay-right-size">
                     <h1>Select Size</h1>
                     <div className="productdisplay-right-sizes">
-                        <div>S</div>
-                        <div>M</div>
-                        <div>L</div>
-                        <div>XL</div>
-                        <div>XXL</div>
+                        {SIZES.map(size => (
+                            <div
+                                key={size}
+                                className={`size-option${selectedSize === size ? ' selected' : ''}`}
+                                onClick={() => setSelectedSize(size)}
+                                tabIndex={0}
+                            >
+                                {size}
+                            </div>
+                        ))}
                     </div>
                 </div>
-                <button onClick={() => { addToCart(product.id) }}>ADD TO CART</button>
+                <button onClick={handleAddToCart}>ADD TO CART</button>
                 <p className="productdisplay-right-category"><span>Category: </span>Women, T-Shirt, Crop Top</p>
                 <p className="productdisplay-right-category"><span>Tag: </span>Modern, Latest</p>
-
             </div>
         </div>
     )

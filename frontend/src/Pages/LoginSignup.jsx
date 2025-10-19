@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import './CSS/LoginSignup.css'
 import { API_BASE_URL } from '../config'
+import { useNavigate } from 'react-router-dom'
 
 const LoginSignup = () => {
   const [mode, setMode] = useState('signup')
@@ -8,6 +9,8 @@ const LoginSignup = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  const navigate = useNavigate()
 
   const toggleMode = () => {
     setMode((prev) => (prev === 'signup' ? 'login' : 'signup'))
@@ -48,14 +51,29 @@ const LoginSignup = () => {
         throw new Error(data.message || 'Không thể xử lý yêu cầu.')
       }
 
+      // Lưu token và tên user vào localStorage
       if (data.token) {
         localStorage.setItem('auth_token', data.token)
       }
+      if (data.user && data.user.name) {
+        localStorage.setItem('user_name', data.user.name)
+      }
+
       setSuccess(
         mode === 'signup'
           ? 'Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.'
           : 'Đăng nhập thành công!'
       )
+
+      // Nếu đăng nhập, chuyển về trang chủ
+      if (mode === 'login') {
+        setTimeout(() => {
+          navigate('/')
+          window.location.reload();
+        }, 1000) // chờ 1s để hiện thông báo thành công trước khi chuyển
+      }
+
+      // Nếu đăng ký thì chuyển sang mode login
       if (mode === 'signup') {
         setForm({ name: '', email: '', password: '' })
         setMode('login')
