@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react'
 import './CartItems.css'
 import { ShopContext } from '../../Context/ShopContext'
 import remove_icon from '../assests/cart_cross_icon.png'
+import cart_header_icon from '../assests/cart_icon.png'
 import { resolveImageUrl } from '../../config'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../Context/AuthContext'
@@ -47,8 +48,21 @@ const CartItems = () => {
     navigate('/checkout')
   }
 
+  const handleContinueShopping = () => {
+    navigate('/')
+  }
+
   return (
     <div className='cartitems'>
+      <div className='cartitems-header'>
+        <div className='cartitems-header-brand'>
+          <img src={cart_header_icon} alt='' />
+          <span>SHOPPER</span>
+        </div>
+        <button type='button' onClick={handleContinueShopping}>
+          Tiếp tục mua hàng
+        </button>
+      </div>
       <div className='cartitems-format-main'>
         <p>Sản phẩm</p>
         <p>Tên</p>

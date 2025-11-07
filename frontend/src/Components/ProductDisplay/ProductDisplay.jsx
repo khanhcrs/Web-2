@@ -1,9 +1,10 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react'
+import React, { useContext, useMemo, useState } from 'react'
 import './ProductDisplay.css'
 import star_icon from '../assests/star_icon.png'
 import star_dull_icon from '../assests/star_dull_icon.png'
 import { ShopContext } from '../../Context/ShopContext'
 import { resolveImageUrl } from '../../config'
+import { useNavigate } from 'react-router-dom'
 
 const ProductDisplay = (props) => {
   const { product } = props
@@ -11,15 +12,10 @@ const ProductDisplay = (props) => {
   const productImage = resolveImageUrl(product?.image)
   const [selectedSize, setSelectedSize] = useState(null)
   const [quantity, setQuantity] = useState(1)
-  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
+  const navigate = useNavigate()
 
   const sizeOptions = useMemo(() => ['S', 'M', 'L', 'XL', 'XXL'], [])
-
-  useEffect(() => {
-    if (!feedbackMessage) return
-    const timeout = setTimeout(() => setFeedbackMessage(''), 2500)
-    return () => clearTimeout(timeout)
-  }, [feedbackMessage])
 
   if (!product) {
     return null
@@ -27,7 +23,7 @@ const ProductDisplay = (props) => {
 
   const handleAddToCart = () => {
     addToCart(product.id, quantity)
-    setFeedbackMessage('Đã thêm sản phẩm vào giỏ hàng thành công!')
+    setIsFeedbackModalOpen(true)
   }
 
   const handleQuantityChange = (delta) => {
@@ -35,6 +31,20 @@ const ProductDisplay = (props) => {
       const nextValue = Math.max(prev + delta, 1)
       return nextValue
     })
+  }
+
+  const handleCloseFeedbackModal = () => {
+    setIsFeedbackModalOpen(false)
+  }
+
+  const handleViewCart = () => {
+    handleCloseFeedbackModal()
+    navigate('/cart')
+  }
+
+  const handleContinueShopping = () => {
+    handleCloseFeedbackModal()
+    navigate('/')
   }
 
   return (
@@ -109,9 +119,6 @@ const ProductDisplay = (props) => {
           </div>
         </div>
         <button onClick={handleAddToCart}>THÊM VÀO GIỎ</button>
-        {feedbackMessage && (
-          <p className='productdisplay-feedback'>{feedbackMessage}</p>
-        )}
         <p className='productdisplay-right-category'>
           <span>Danh mục: </span>Phụ nữ, Áo thun, Áo croptop
         </p>
@@ -119,6 +126,41 @@ const ProductDisplay = (props) => {
           <span>Thẻ: </span>Hiện đại, Mới nhất
         </p>
       </div>
+      {isFeedbackModalOpen && (
+        <div className='productdisplay-feedback-backdrop'>
+          <div className='productdisplay-feedback-modal' role='alertdialog' aria-modal='true'>
+            <button
+              type='button'
+              className='productdisplay-feedback-close'
+              onClick={handleCloseFeedbackModal}
+              aria-label='Đóng thông báo'
+            >
+              ×
+            </button>
+            <div className='productdisplay-feedback-icon'>✓</div>
+            <h2>Thêm vào giỏ hàng thành công</h2>
+            <div className='productdisplay-feedback-product-info'>
+              <img
+                className='productdisplay-feedback-product-image'
+                src={productImage}
+                alt={product.name}
+              />
+              <div className='productdisplay-feedback-product-details'>
+                <p className='productdisplay-feedback-product'>{product.name}</p>
+                <p className='productdisplay-feedback-quantity'>Số lượng: {quantity}</p>
+              </div>
+            </div>
+            <div className='productdisplay-feedback-actions'>
+              <button type='button' className='continue' onClick={handleContinueShopping}>
+                Tiếp tục mua sắm
+              </button>
+              <button type='button' className='view-cart' onClick={handleViewCart}>
+                Xem giỏ hàng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
