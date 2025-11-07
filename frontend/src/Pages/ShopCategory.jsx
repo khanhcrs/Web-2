@@ -15,10 +15,10 @@ const ShopCategory = (props) => {
       <img src={props.banner} alt='' />
       <div className='shopcategory-indexSort'>
         <p>
-          <span>Showing {filteredProducts.length}</span> sản phẩm trong danh mục
+          <span>Đang hiển thị {filteredProducts.length}</span> sản phẩm trong danh mục
         </p>
         <div className='shopcategory-sort'>
-          Sort by <img src={dropdown_icon} alt='' />
+          Sắp xếp theo <img src={dropdown_icon} alt='' />
         </div>
       </div>
       <div className='shopcategory-products'>
@@ -38,7 +38,7 @@ const ShopCategory = (props) => {
           <p className='shopcategory-empty'>Không có sản phẩm nào phù hợp.</p>
         )}
       </div>
-      <div className='shopcategory-loadmore'>More</div>
+      <div className='shopcategory-loadmore'>Xem thêm</div>
     </div>
   )
 }
