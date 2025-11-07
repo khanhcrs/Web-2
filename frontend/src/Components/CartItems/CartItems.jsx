@@ -1,9 +1,10 @@
-import React, { useContext } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import './CartItems.css'
 import { ShopContext } from '../../Context/ShopContext'
 import remove_icon from '../assests/cart_cross_icon.png'
 import { resolveImageUrl } from '../../config'
 import { useNavigate } from 'react-router-dom'
+import { AuthContext } from '../../Context/AuthContext'
 
 const CartItems = () => {
   const {
@@ -12,15 +13,38 @@ const CartItems = () => {
     cartItems,
     removeFromCart,
     loadingProducts,
-    getTotalCartItems
+    getTotalCartItems,
+    addToCart,
+    setCartItemQuantity
   } = useContext(ShopContext)
+  const { isAuthenticated } = useContext(AuthContext)
   const navigate = useNavigate()
   const hasItemsInCart = getTotalCartItems() > 0
   const totalAmount = getTotalCartAmount()
+  const [feedbackMessage, setFeedbackMessage] = useState('')
 
   const formatCurrency = (value) => {
     const amount = Number(value) || 0
     return `${amount.toLocaleString('vi-VN')}đ`
+  }
+
+  useEffect(() => {
+    if (!feedbackMessage) return
+    const timeout = setTimeout(() => setFeedbackMessage(''), 2500)
+    return () => clearTimeout(timeout)
+  }, [feedbackMessage])
+
+  const handleCheckout = () => {
+    if (!hasItemsInCart) {
+      return
+    }
+
+    if (!isAuthenticated) {
+      setFeedbackMessage('Vui lòng đăng nhập để có thể thanh toán.')
+      return
+    }
+
+    navigate('/checkout')
   }
 
   return (
@@ -48,15 +72,27 @@ const CartItems = () => {
                   />
                   <p>{product.name}</p>
                   <p>{formatCurrency(product.new_price)}</p>
-                  <button className='cartitems-quantity'>
-                    {cartItems[product.id]}
-                  </button>
+                  <div className='cartitems-quantity-control'>
+                    <button
+                      type='button'
+                      onClick={() => removeFromCart(product.id)}
+                      aria-label='Giảm số lượng'
+                    >
+                      −
+                    </button>
+                    <span>{cartItems[product.id]}</span>
+                    <button
+                      type='button'
+                      onClick={() => addToCart(product.id)}
+                      aria-label='Tăng số lượng'
+                    >
+                      +
+                    </button>
+                  </div>
                   <p>{formatCurrency(product.new_price * cartItems[product.id])}</p>
                   <img
                     src={remove_icon}
-                    onClick={() => {
-                      removeFromCart(product.id)
-                    }}
+                    onClick={() => setCartItemQuantity(product.id, 0)}
                     alt='Xoá khỏi giỏ'
                   />
                 </div>
@@ -85,12 +121,12 @@ const CartItems = () => {
               <h3>{formatCurrency(totalAmount)}</h3>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/checkout')}
-            disabled={!hasItemsInCart}
-          >
+          <button onClick={handleCheckout} disabled={!hasItemsInCart}>
             TIẾN HÀNH THANH TOÁN
           </button>
+          {feedbackMessage && (
+            <p className='cartitems-feedback'>{feedbackMessage}</p>
+          )}
         </div>
         <div className='cartitems-promocode'>
           <p>Nếu bạn có mã giảm giá, hãy nhập tại đây</p>
