@@ -112,13 +112,7 @@ const LoginSignup = () => {
             {mode === 'signup' ? 'Đăng nhập ngay' : 'Đăng ký ngay'}
           </span>
         </p>
-        <div className='loginsignup-agree'>
-          <input type='checkbox' name='' id='' />
-          <p>
-            Bằng cách tiếp tục, tôi đồng ý với điều khoản sử dụng và chính sách
-            bảo mật
-          </p>
-        </div>
+      
       </div>
     </div>
   )
