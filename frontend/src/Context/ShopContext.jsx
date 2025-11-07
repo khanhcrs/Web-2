@@ -61,10 +61,12 @@ const ShopContextProvider = (props) => {
     fetchProducts()
   }, [fetchProducts])
 
-  const addToCart = (itemId) => {
+  const addToCart = (itemId, quantity = 1) => {
+    const normalizedQuantity = Number.isFinite(quantity) ? quantity : 1
     setCartItems((prev) => {
       if (!(itemId in prev)) return prev
-      return { ...prev, [itemId]: prev[itemId] + 1 }
+      const nextValue = Math.max(prev[itemId] + normalizedQuantity, 0)
+      return { ...prev, [itemId]: nextValue }
     })
   }
 
@@ -72,6 +74,15 @@ const ShopContextProvider = (props) => {
     setCartItems((prev) => {
       if (!(itemId in prev)) return prev
       const nextValue = Math.max(prev[itemId] - 1, 0)
+      return { ...prev, [itemId]: nextValue }
+    })
+  }
+
+  const setCartItemQuantity = (itemId, quantity) => {
+    const normalizedQuantity = Number.isFinite(quantity) ? quantity : 0
+    setCartItems((prev) => {
+      if (!(itemId in prev)) return prev
+      const nextValue = Math.max(normalizedQuantity, 0)
       return { ...prev, [itemId]: nextValue }
     })
   }
@@ -111,6 +122,7 @@ const ShopContextProvider = (props) => {
     cartItems,
     addToCart,
     removeFromCart,
+    setCartItemQuantity,
     loadingProducts,
     productError: error,
     refreshProducts: fetchProducts,
