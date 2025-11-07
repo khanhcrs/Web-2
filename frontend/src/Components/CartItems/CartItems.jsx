@@ -26,12 +26,12 @@ const CartItems = () => {
   return (
     <div className='cartitems'>
       <div className='cartitems-format-main'>
-        <p>Products</p>
-        <p>Title</p>
-        <p>Price</p>
-        <p>Quantity</p>
-        <p>Total</p>
-        <p>Remove</p>
+        <p>Sản phẩm</p>
+        <p>Tên</p>
+        <p>Giá</p>
+        <p>Số lượng</p>
+        <p>Tổng</p>
+        <p>Xoá</p>
       </div>
       <hr />
       {loadingProducts && <p className='cartitems-loading'>Đang tải sản phẩm...</p>}
@@ -68,20 +68,20 @@ const CartItems = () => {
         })}
       <div className='cartitems-down'>
         <div className='cartitems-total'>
-          <h1>Cart Total</h1>
+          <h1>Tổng giỏ hàng</h1>
           <div>
             <div className='cartitems-total-item'>
-              <p>Subtotal</p>
+              <p>Tạm tính</p>
               <p>{formatCurrency(totalAmount)}</p>
             </div>
             <hr />
             <div className='cartitems-total-item'>
-              <p>Shipping Fee</p>
-              <p>Free</p>
+              <p>Phí vận chuyển</p>
+              <p>Miễn phí</p>
             </div>
             <hr />
             <div className='cartitems-total-item'>
-              <h3>Total</h3>
+              <h3>Tổng cộng</h3>
               <h3>{formatCurrency(totalAmount)}</h3>
             </div>
           </div>
@@ -93,10 +93,10 @@ const CartItems = () => {
           </button>
         </div>
         <div className='cartitems-promocode'>
-          <p>If you have a promo code, Enter it here</p>
+          <p>Nếu bạn có mã giảm giá, hãy nhập tại đây</p>
           <div className='cartitems-promobox'>
-            <input type='text' placeholder='promo code' />
-            <button>Submit</button>
+            <input type='text' placeholder='Mã giảm giá' />
+            <button>Áp dụng</button>
           </div>
         </div>
       </div>

@@ -46,7 +46,7 @@ const ProductDisplay = (props) => {
 
                 </div>
                 <div className="productdisplay-right-size">
-                    <h1>Select Size</h1>
+                    <h1>Chọn kích thước</h1>
                     <div className="productdisplay-right-sizes">
                         <div>S</div>
                         <div>M</div>
@@ -55,9 +55,9 @@ const ProductDisplay = (props) => {
                         <div>XXL</div>
                     </div>
                 </div>
-                <button onClick={() => { addToCart(product.id) }}>ADD TO CART</button>
-                <p className="productdisplay-right-category"><span>Category: </span>Women, T-Shirt, Crop Top</p>
-                <p className="productdisplay-right-category"><span>Tag: </span>Modern, Latest</p>
+                <button onClick={() => { addToCart(product.id) }}>THÊM VÀO GIỎ</button>
+                <p className="productdisplay-right-category"><span>Danh mục: </span>Phụ nữ, Áo thun, Áo croptop</p>
+                <p className="productdisplay-right-category"><span>Thẻ: </span>Hiện đại, Mới nhất</p>
 
             </div>
         </div>

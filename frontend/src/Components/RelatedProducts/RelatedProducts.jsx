@@ -25,7 +25,7 @@ const RelatedProducts = ({ currentProductId, category }) => {
 
   return (
     <div className='relatedproducts'>
-      <h1>Related Products</h1>
+      <h1>Sản phẩm liên quan</h1>
       <hr />
       <div className='relatedproducts-item'>
         {loadingProducts && (

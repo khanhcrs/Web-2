@@ -46,7 +46,7 @@ const ShopContextProvider = (props) => {
         setError('Không có sản phẩm từ máy chủ, sử dụng dữ liệu mặc định.')
       }
     } catch (err) {
-      console.error('Failed to load products', err)
+      console.error('Không thể tải sản phẩm', err)
       setProducts(fallbackProducts)
       setCartItems((previous) =>
         buildCartFromProducts(fallbackProducts, previous)

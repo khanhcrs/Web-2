@@ -15,11 +15,11 @@ const Footer = () => {
                 </p>
             </div>
             <ul className="footer-links">
-                <li>Company</li>
-                <li>Products</li>
-                <li>Ofices</li>
-                <li>About</li>
-                <li>Contact</li>
+                <li>Về chúng tôi</li>
+                <li>Sản phẩm</li>
+                <li>Văn phòng</li>
+                <li>Giới thiệu</li>
+                <li>Liên hệ</li>
 
             </ul>
             <div className="footer-social-icon">
@@ -35,7 +35,7 @@ const Footer = () => {
             </div>
             <div className="footer-copyright">
                 <hr />
-                <p>Copyright @ 2023 - All Right Reserved</p>
+                <p>Bản quyền © 2023 - Đã đăng ký bản quyền</p>
             </div>
         </div>
     )
