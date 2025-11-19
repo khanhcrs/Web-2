@@ -11,7 +11,7 @@ const Hero = () => {
                 <h2>Dành cho khách hàng mới</h2>
                 <div>
                     <div className="hero-hand-icon">
-                        <p>New</p>
+                        <p>Mới</p>
                         <img src={hand_icon} alt="" />
                     </div>
                     <p>Bộ sưu tập</p>

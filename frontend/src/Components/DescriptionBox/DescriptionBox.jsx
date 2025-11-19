@@ -5,20 +5,18 @@ const DescriptionBox = () => {
     return (
         <div className='descriptionbox'>
             <div className="descriptionbox-navigator">
-                <div className="descriptionbox-nav-box">Description</div>
-                <div className="descriptionbox-nav-box fade">Reviews(122)</div>
+                <div className="descriptionbox-nav-box">Mô tả</div>
+                <div className="descriptionbox-nav-box fade">Đánh giá (122)</div>
             </div>
             <div className="descriptionbox-description">
                 <p>
-                    An e-commerce website is an online platform that facilitates the buying and selling of products or services over the internet.
-                    It serves as a virtual marketplace where businesses and individuals showcase their products, interact with customers, and conduct
-                    transactions without the need for a physical presence. E-commerce websites have gained immense popularity due to their convenience, accessibility,
-                    and the global reach they offer.
+                    Website thương mại điện tử là nền tảng trực tuyến giúp việc mua bán sản phẩm hoặc dịch vụ diễn ra qua internet.
+                    Đây là chợ ảo nơi doanh nghiệp và cá nhân giới thiệu sản phẩm, tương tác với khách hàng và giao dịch mà không cần hiện diện vật lý.
+                    Các trang thương mại điện tử ngày càng phổ biến nhờ sự tiện lợi, dễ tiếp cận và khả năng mở rộng ra thị trường toàn cầu.
                 </p>
                 <p>
-                    E-commerce websites typically display products or services along with detailed descriptions,
-                    images, prices, and any available variants (e.g., sizes, colors). Each product usually has its own dedicated
-                    page with relevant information, customer reviews, and purchase options to help shoppers make informed decisions.
+                    Thông thường, website thương mại điện tử hiển thị sản phẩm cùng mô tả chi tiết, hình ảnh, giá bán và các lựa chọn khác nhau như kích thước, màu sắc.
+                    Mỗi sản phẩm đều có trang riêng với thông tin liên quan, đánh giá từ khách hàng và tuỳ chọn mua hàng để giúp người mua đưa ra quyết định chính xác.
 
                 </p>
             </div>

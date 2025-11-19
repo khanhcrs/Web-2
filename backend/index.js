@@ -57,16 +57,235 @@ app.use('/images', express.static(path.join(__dirname, 'upload', 'images')));
 
 // Upload endpoint
 app.post('/upload', upload.single('product'), (req, res) => {
-    console.log(req.file);
-    res.json({
-        success: 1,
-        image_url: `/images/${req.file.filename}`
-    });
+  console.log(req.file);
+  res.json({
+    success: 1,
+    image_url: `/images/${req.file.filename}`
+  });
+});
+const Product = mongoose.model('Product', {
+  id: {
+    type: Number,
+    required: true,
+    unique: true,
+  },
+  name: {
+    type: String,
+    required: true,
+  },
+  image: {
+    type: String,
+    required: true,
+  },
+  category: {
+    type: String,
+    required: true,
+  },
+  new_price: {
+    type: Number,
+    required: true,
+  },
+  old_price: {
+    type: Number,
+    required: true,
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
+  available: {
+    type: Boolean,
+    default: true,
+  },
+});
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    trim: true,
+    unique: true,
+    lowercase: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ['active', 'suspended'],
+    default: 'active',
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const orderSchema = new mongoose.Schema({
+  orderId: {
+    type: Number,
+    required: true,
+    unique: true,
+  },
+  customer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  customerName: String,
+  customerEmail: String,
+  items: [
+    {
+      productId: Number,
+      name: String,
+      quantity: Number,
+      price: Number,
+    },
+  ],
+  total: {
+    type: Number,
+    default: 0,
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'processing', 'shipped'],
+    default: 'pending',
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed'],
+    default: 'pending',
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['cash_on_delivery', 'credit_card'],
+    default: 'cash_on_delivery',
+  },
+  paymentReference: String,
+  paymentDetails: {
+    cardLast4: String,
+    cardholderName: String,
+  },
+  paidAt: Date,
+  shippingAddress: String,
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
 // ================== PRODUCTS ==================
 
-// ADD PRODUCT
+const allowedOrderStatuses = ['pending', 'processing', 'shipped'];
+const allowedPaymentStatuses = ['pending', 'paid', 'failed'];
+const allowedPaymentMethods = ['cash_on_delivery', 'credit_card'];
+
+const sanitizeOrderItems = (items) => {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => ({
+      productId: Number(item.productId) || 0,
+      name: item.name,
+      quantity: Number(item.quantity) || 0,
+      price: Number(item.price) || 0,
+    }))
+    .filter((item) => item.productId && item.quantity > 0 && item.price >= 0);
+};
+
+const calculateOrderTotal = (items) =>
+  items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+const parseDate = (value) => {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+const resolveCustomerInfo = async (customerId, fallbackName, fallbackEmail) => {
+  let customerRef = null;
+  let resolvedName = fallbackName;
+  let resolvedEmail = fallbackEmail;
+
+  if (customerId) {
+    const customer = await User.findById(customerId).lean();
+    if (customer) {
+      customerRef = customer._id;
+      resolvedName = customer.name;
+      resolvedEmail = customer.email;
+    }
+  }
+
+  return { customerRef, resolvedName, resolvedEmail };
+};
+
+const generateNextOrderId = async () => {
+  const lastOrder = await Order.findOne({}).sort({ orderId: -1 }).lean();
+  return lastOrder ? lastOrder.orderId + 1 : 1;
+};
+
+const sanitizeStoredPaymentDetails = (details) => {
+  if (!details) {
+    return undefined;
+  }
+  const sanitized = {};
+  if (details.cardLast4) {
+    sanitized.cardLast4 = String(details.cardLast4).slice(-4);
+  }
+  if (details.cardholderName) {
+    sanitized.cardholderName = String(details.cardholderName).trim();
+  }
+  return Object.keys(sanitized).length ? sanitized : undefined;
+};
+
+const validateCardDetails = (details = {}) => {
+  const rawNumber = String(details.cardNumber || '').replace(/\s+/g, '');
+  if (!/^\d{13,19}$/.test(rawNumber)) {
+    return { valid: false, message: 'Số thẻ không hợp lệ.' };
+  }
+
+  const cardholderName = String(details.cardholderName || '').trim();
+  if (cardholderName.length < 2) {
+    return { valid: false, message: 'Tên chủ thẻ không hợp lệ.' };
+  }
+
+  const month = Number(details.expiryMonth);
+  const year = Number(details.expiryYear);
+
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return { valid: false, message: 'Tháng hết hạn không hợp lệ.' };
+  }
+
+  if (!Number.isInteger(year) || year < 2000 || year > new Date().getFullYear() + 25) {
+    return { valid: false, message: 'Năm hết hạn không hợp lệ.' };
+  }
+
+  const now = new Date();
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+  if (endOfMonth < now) {
+    return { valid: false, message: 'Thẻ đã hết hạn.' };
+  }
+
+  if (!/^\d{3,4}$/.test(String(details.cvv || ''))) {
+    return { valid: false, message: 'Mã CVV không hợp lệ.' };
+  }
+
+  return {
+    valid: true,
+    sanitized: {
+      last4: rawNumber.slice(-4),
+      cardholderName,
+    },
+  };
+};
 app.post('/addproduct', async (req, res) => {
     try {
         const { name, image, category, new_price, old_price } = req.body;
@@ -438,29 +657,29 @@ app.post('/removefromcart', fetchuser, async (req, res) => {
     }
 });
 
-// ================== ORDERS ==================
-const formatOrderResponse = (order, items = []) => ({
-    orderId: order.order_id,
-    status: order.status,
-    total: Number(order.total),
-    createdAt: order.created_at,
-    customer: order.customer_id
-        ? {
-            id: order.customer_id,
-            name: order.user_name || order.customer_name,
-            email: order.user_email || order.customer_email,
-            status: order.user_status || 'active',
-        }
-        : {
-            name: order.customer_name,
-            email: order.customer_email,
-        },
-    items: items.map(item => ({
-        productId: item.product_id,
-        name: item.name,
-        quantity: item.quantity,
-        price: Number(item.price),
-    })),
+const formatOrderResponse = (order) => ({
+  orderId: order.orderId,
+  status: order.status,
+  total: order.total,
+  createdAt: order.createdAt,
+  paymentStatus: order.paymentStatus,
+  paymentMethod: order.paymentMethod,
+  paymentReference: order.paymentReference,
+  paymentDetails: order.paymentDetails,
+  paidAt: order.paidAt,
+  shippingAddress: order.shippingAddress,
+  customer: order.customer
+    ? {
+        id: order.customer._id,
+        name: order.customer.name,
+        email: order.customer.email,
+        status: order.customer.status,
+      }
+    : {
+        name: order.customerName,
+        email: order.customerEmail,
+      },
+  items: order.items || [],
 });
 
 // GET ORDERS
@@ -507,129 +726,182 @@ app.get('/orders', async (req, res) => {
 
 // CREATE ORDER
 app.post('/orders', async (req, res) => {
-    try {
-        const { customerId, customerName, customerEmail, items = [], total = 0, status = 'pending' } = req.body;
+  try {
+    const {
+      customerId,
+      customerName,
+      customerEmail,
+      items = [],
+      total = 0,
+      status = 'pending',
+      paymentStatus = 'pending',
+      paymentMethod = 'cash_on_delivery',
+      paymentReference,
+      paidAt,
+      shippingAddress,
+      paymentDetails,
+    } = req.body;
 
-        const allowedStatuses = ['pending', 'processing', 'shipped'];
-        const normalizedStatus = allowedStatuses.includes(status) ? status : 'pending';
+    const normalizedStatus = allowedOrderStatuses.includes(status)
+      ? status
+      : 'pending';
+    const normalizedPaymentStatus = allowedPaymentStatuses.includes(paymentStatus)
+      ? paymentStatus
+      : 'pending';
+    const normalizedPaymentMethod = allowedPaymentMethods.includes(paymentMethod)
+      ? paymentMethod
+      : 'cash_on_delivery';
 
-        const lastOrder = await pool.query(
-            'SELECT order_id FROM orders ORDER BY order_id DESC LIMIT 1'
-        );
-        const nextOrderId = lastOrder.rowCount > 0 ? lastOrder.rows[0].order_id + 1 : 1;
+    const orderId = await generateNextOrderId();
 
-        let customer_id = null;
-        let resolvedName = customerName || null;
-        let resolvedEmail = customerEmail || null;
-        let user_status = null;
+    const { customerRef, resolvedName, resolvedEmail } = await resolveCustomerInfo(
+      customerId,
+      customerName,
+      customerEmail
+    );
 
-        if (customerId) {
-            const userResult = await pool.query(
-                'SELECT id, name, email, status FROM users WHERE id = $1',
-                [customerId]
-            );
-            if (userResult.rowCount > 0) {
-                const user = userResult.rows[0];
-                customer_id = user.id;
-                resolvedName = user.name;
-                resolvedEmail = user.email;
-                user_status = user.status;
-            }
-        }
+    const sanitizedItems = sanitizeOrderItems(items);
+    const computedTotal = calculateOrderTotal(sanitizedItems);
+    const parsedTotal = Number(total);
+    const finalTotal =
+      !Number.isNaN(parsedTotal) && parsedTotal > 0 ? parsedTotal : computedTotal;
 
-        const sanitizedItems = Array.isArray(items)
-            ? items.map((item) => ({
-                product_id: item.productId,
-                name: item.name,
-                quantity: Number(item.quantity) || 0,
-                price: Number(item.price) || 0,
-            }))
-            : [];
+    const resolvedPaidAt =
+      normalizedPaymentStatus === 'paid'
+        ? parseDate(paidAt) || new Date()
+        : undefined;
 
-        const parsedTotal = Number(total) || 0;
+    const sanitizedPaymentDetails =
+      normalizedPaymentMethod === 'credit_card'
+        ? sanitizeStoredPaymentDetails(paymentDetails)
+        : undefined;
 
-        const orderInsert = await pool.query(
-            `INSERT INTO orders (order_id, customer_id, customer_name, customer_email, total, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-            [nextOrderId, customer_id, resolvedName, resolvedEmail, parsedTotal, normalizedStatus]
-        );
+    const order = new Order({
+      orderId,
+      customer: customerRef,
+      customerName: resolvedName,
+      customerEmail: resolvedEmail,
+      items: sanitizedItems,
+      total: finalTotal,
+      status: normalizedStatus,
+      paymentStatus: normalizedPaymentStatus,
+      paymentMethod: normalizedPaymentMethod,
+      paymentReference,
+      paidAt: resolvedPaidAt,
+      paymentDetails: sanitizedPaymentDetails,
+      shippingAddress: shippingAddress || undefined,
+    });
 
-        const orderDb = orderInsert.rows[0];
-
-        for (const item of sanitizedItems) {
-            await pool.query(
-                `INSERT INTO order_items (order_id, product_id, name, quantity, price)
-         VALUES ($1, $2, $3, $4, $5)`,
-                [orderDb.id, item.product_id, item.name, item.quantity, item.price]
-            );
-        }
-
-        const formatted = formatOrderResponse(
-            {
-                ...orderDb,
-                user_name: resolvedName,
-                user_email: resolvedEmail,
-                user_status: user_status,
-            },
-            sanitizedItems.map(i => ({
-                product_id: i.product_id,
-                name: i.name,
-                quantity: i.quantity,
-                price: i.price,
-            }))
-        );
-
-        res.json({ success: true, order: formatted });
-    } catch (error) {
-        console.error('Error creating order', error);
-        res.status(500).json({ success: false, message: 'Unable to create order.' });
-    }
+    await order.save();
+    const populatedOrder = await order.populate('customer', 'name email status');
+    res.json({ success: true, order: formatOrderResponse(populatedOrder) });
+  } catch (error) {
+    console.error('Error creating order', error);
+    res.status(500).json({ success: false, message: 'Unable to create order.' });
+  }
 });
 
-// UPDATE ORDER STATUS
+app.post('/checkout', async (req, res) => {
+  try {
+    const {
+      customerId,
+      customerName,
+      customerEmail,
+      items = [],
+      shippingAddress,
+      paymentMethod = 'cash_on_delivery',
+      paymentDetails = {},
+    } = req.body;
+
+    if (!customerName || !customerEmail) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Thiếu thông tin khách hàng.' });
+    }
+
+    const sanitizedItems = sanitizeOrderItems(items);
+    if (!sanitizedItems.length) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Giỏ hàng trống, không thể thanh toán.' });
+    }
+
+    const normalizedPaymentMethod = allowedPaymentMethods.includes(paymentMethod)
+      ? paymentMethod
+      : 'cash_on_delivery';
+
+    let paymentStatus = 'pending';
+    let paymentReference = undefined;
+    let resolvedPaidAt = undefined;
+    let sanitizedPaymentDetails = undefined;
+
+    if (normalizedPaymentMethod === 'credit_card') {
+      const cardValidation = validateCardDetails(paymentDetails);
+      if (!cardValidation.valid) {
+        return res
+          .status(400)
+          .json({ success: false, message: cardValidation.message });
+      }
+      paymentStatus = 'paid';
+      paymentReference = `PAY-${Date.now()}`;
+      resolvedPaidAt = new Date();
+      sanitizedPaymentDetails = {
+        cardLast4: cardValidation.sanitized.last4,
+        cardholderName: cardValidation.sanitized.cardholderName,
+      };
+    }
+
+    if (normalizedPaymentMethod === 'cash_on_delivery') {
+      paymentReference = `COD-${Date.now()}`;
+    }
+
+    const orderId = await generateNextOrderId();
+    const { customerRef, resolvedName, resolvedEmail } = await resolveCustomerInfo(
+      customerId,
+      customerName,
+      customerEmail
+    );
+
+    const total = calculateOrderTotal(sanitizedItems);
+    if (total <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Tổng thanh toán không hợp lệ.' });
+    }
+
+    const order = new Order({
+      orderId,
+      customer: customerRef,
+      customerName: resolvedName,
+      customerEmail: resolvedEmail,
+      items: sanitizedItems,
+      total,
+      status: 'pending',
+      paymentStatus,
+      paymentMethod: normalizedPaymentMethod,
+      paymentReference,
+      paidAt: resolvedPaidAt,
+      paymentDetails: sanitizedPaymentDetails,
+      shippingAddress: shippingAddress || undefined,
+    });
+
+    await order.save();
+    const populatedOrder = await order.populate('customer', 'name email status');
+
+    res.json({ success: true, order: formatOrderResponse(populatedOrder) });
+  } catch (error) {
+    console.error('Error processing checkout', error);
+    res.status(500).json({ success: false, message: 'Unable to process checkout.' });
+  }
+});
+
 app.patch('/orders/:orderId', async (req, res) => {
-    try {
-        const { orderId } = req.params;
-        const { status } = req.body;
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
 
-        const allowedStatuses = ['pending', 'processing', 'shipped'];
-        if (!allowedStatuses.includes(status)) {
-            return res.status(400).json({ success: false, message: 'Invalid order status.' });
-        }
-
-        const updateResult = await pool.query(
-            'UPDATE orders SET status = $1 WHERE order_id = $2 RETURNING id',
-            [status, Number(orderId)]
-        );
-
-        if (updateResult.rowCount === 0) {
-            return res.status(404).json({ success: false, message: 'Order not found.' });
-        }
-
-        const orderPkId = updateResult.rows[0].id;
-
-        const orderResult = await pool.query(
-            `SELECT o.*, u.name AS user_name, u.email AS user_email, u.status AS user_status
-       FROM orders o
-       LEFT JOIN users u ON o.customer_id = u.id
-       WHERE o.id = $1`,
-            [orderPkId]
-        );
-
-        const orderRow = orderResult.rows[0];
-
-        const itemsResult = await pool.query(
-            'SELECT * FROM order_items WHERE order_id = $1',
-            [orderPkId]
-        );
-
-        const formatted = formatOrderResponse(orderRow, itemsResult.rows);
-
-        res.json({ success: true, order: formatted });
-    } catch (error) {
-        console.error('Error updating order', error);
-        res.status(500).json({ success: false, message: 'Unable to update order.' });
+    if (!allowedOrderStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid order status.' });
     }
 });
 

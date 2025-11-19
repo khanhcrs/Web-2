@@ -31,6 +31,7 @@ const ShopContextProvider = (props) => {
         setError('Không có sản phẩm từ máy chủ, sử dụng dữ liệu mặc định.')
       }
     } catch (err) {
+      console.error('Không thể tải sản phẩm', err)
       setProducts(fallbackProducts)
       setError('Không thể tải sản phẩm mới, sử dụng dữ liệu cục bộ.')
     } finally {
@@ -42,14 +43,13 @@ const ShopContextProvider = (props) => {
     fetchProducts()
   }, [fetchProducts])
 
-  // Thêm sản phẩm với size
-  const addToCart = (itemId, size) => {
-    if (!size) {
-      alert('Vui lòng chọn size trước khi thêm vào giỏ hàng!')
-      return
-    }
-    const key = `${itemId}-${size}`
-    setCartItems((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }))
+  const addToCart = (itemId, quantity = 1) => {
+    const normalizedQuantity = Number.isFinite(quantity) ? quantity : 1
+    setCartItems((prev) => {
+      if (!(itemId in prev)) return prev
+      const nextValue = Math.max(prev[itemId] + normalizedQuantity, 0)
+      return { ...prev, [itemId]: nextValue }
+    })
   }
 
   // Xóa theo size
@@ -62,7 +62,15 @@ const ShopContextProvider = (props) => {
     })
   }
 
-  // Tổng tiền (tính từng biến thể sản phẩm)
+  const setCartItemQuantity = (itemId, quantity) => {
+    const normalizedQuantity = Number.isFinite(quantity) ? quantity : 0
+    setCartItems((prev) => {
+      if (!(itemId in prev)) return prev
+      const nextValue = Math.max(normalizedQuantity, 0)
+      return { ...prev, [itemId]: nextValue }
+    })
+  }
+
   const getTotalCartAmount = () => {
     let totalAmount = 0
     for (const key in cartItems) {
@@ -87,6 +95,10 @@ const ShopContextProvider = (props) => {
     return totalItem
   }
 
+  const clearCart = useCallback(() => {
+    setCartItems(buildCartFromProducts(products))
+  }, [products])
+
   const contextValue = {
     getTotalCartItems,
     getTotalCartAmount,
@@ -94,9 +106,11 @@ const ShopContextProvider = (props) => {
     cartItems,
     addToCart,
     removeFromCart,
+    setCartItemQuantity,
     loadingProducts,
     productError: error,
-    refreshProducts: fetchProducts
+    refreshProducts: fetchProducts,
+    clearCart
   }
 
   return (
