@@ -1,27 +1,46 @@
-const port = 4000;
+const port = process.env.PORT || 4000;
 const express = require('express');
 const app = express();
-const mongoose = require('mongoose');
+const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 
+// Load environment variables if .env file exists
+if (process.env.NODE_ENV !== 'production') {
+    try {
+        require('dotenv').config();
+    } catch (e) {
+        console.warn('dotenv not available, using inline config');
+    }
+}
+
 const JWT_SECRET = 'secret_ecom';
 
 app.use(express.json());
 app.use(cors());
 
-// Database Connection
-mongoose.connect("mongodb+srv://hientran:Hien123123@cluster0.qf33pgy.mongodb.net/Clothify");
-
-// API test
-app.get("/", (req, res) => {
-    res.send("Express App is running");
+// ================== PostgreSQL CONNECTION ==================
+const pool = new Pool({
+    user: process.env.POSTGRES_USER || 'postgres',
+    host: process.env.POSTGRES_HOST || 'localhost',
+    database: process.env.POSTGRES_DB || 'clothify',
+    password: process.env.POSTGRES_PASSWORD || 'kt123456',
+    port: process.env.POSTGRES_PORT || 5432,
 });
 
-// Image Storage Engine
+pool.connect()
+    .then(() => console.log('Connected to PostgreSQL'))
+    .catch(err => console.error('PostgreSQL connection error', err.stack));
+
+// ================== API TEST ==================
+app.get("/", (req, res) => {
+    res.send("Express App is running with PostgreSQL");
+});
+
+// ================== IMAGE UPLOAD ==================
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, path.join(__dirname, 'upload', 'images'));
@@ -44,108 +63,10 @@ app.post('/upload', upload.single('product'), (req, res) => {
         image_url: `/images/${req.file.filename}`
     });
 });
-const Product = mongoose.model('Product', {
-    id: {
-        type: Number,
-        required: true,
-        unique: true,
-    },
-    name: {
-        type: String,
-        required: true,
-    },
-    image: {
-        type: String,
-        required: true,
-    },
-    category: {
-        type: String,
-        required: true,
-    },
-    new_price: {
-        type: Number,
-        required: true,
-    },
-    old_price: {
-        type: Number,
-        required: true,
-    },
-    date: {
-        type: Date,
-        default: Date.now,
-    },
-    available: {
-        type: Boolean,
-        default: true,
-    },
-});
 
-const userSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    email: {
-        type: String,
-        required: true,
-        trim: true,
-        unique: true,
-        lowercase: true,
-    },
-    password: {
-        type: String,
-        required: true,
-    },
-    status: {
-        type: String,
-        enum: ['active', 'suspended'],
-        default: 'active',
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-});
+// ================== PRODUCTS ==================
 
-const orderSchema = new mongoose.Schema({
-    orderId: {
-        type: Number,
-        required: true,
-        unique: true,
-    },
-    customer: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-    },
-    customerName: String,
-    customerEmail: String,
-    items: [
-        {
-            productId: Number,
-            name: String,
-            quantity: Number,
-            price: Number,
-        },
-    ],
-    total: {
-        type: Number,
-        default: 0,
-    },
-    status: {
-        type: String,
-        enum: ['pending', 'processing', 'shipped'],
-        default: 'pending',
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-});
-
-const User = mongoose.model('User', userSchema);
-const Order = mongoose.model('Order', orderSchema);
-
+// ADD PRODUCT
 app.post('/addproduct', async (req, res) => {
     try {
         const { name, image, category, new_price, old_price } = req.body;
@@ -156,22 +77,16 @@ app.post('/addproduct', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Missing required product fields.' });
         }
 
-        const lastProduct = await Product.findOne({}).sort({ id: -1 }).lean();
-        const id = lastProduct ? lastProduct.id + 1 : 1;
+        const result = await pool.query(
+            `INSERT INTO products (name, image, category, new_price, old_price)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+            [name, image, category, parsedNewPrice, parsedOldPrice]
+        );
 
-        const product = new Product({
-            id,
-            name,
-            image,
-            category,
-            new_price: parsedNewPrice,
-            old_price: parsedOldPrice,
-        });
-
-        await product.save();
         res.json({
             success: true,
-            product,
+            product: result.rows[0],
         });
     } catch (error) {
         console.error('Error creating product', error);
@@ -179,17 +94,24 @@ app.post('/addproduct', async (req, res) => {
     }
 });
 
-//Creating API For deleting
-
+// REMOVE PRODUCT
 app.post('/removeproduct', async (req, res) => {
     try {
-        const deleted = await Product.findOneAndDelete({ id: req.body.id });
-        if (!deleted) {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ success: false, message: 'Product id is required.' });
+
+        const result = await pool.query(
+            'DELETE FROM products WHERE id = $1 RETURNING *',
+            [Number(id)]
+        );
+
+        if (result.rowCount === 0) {
             return res.status(404).json({ success: false, message: 'Product not found.' });
         }
+
         res.json({
             success: true,
-            product: deleted,
+            product: result.rows[0],
         });
     } catch (error) {
         console.error('Error deleting product', error);
@@ -197,84 +119,122 @@ app.post('/removeproduct', async (req, res) => {
     }
 });
 
+// UPDATE PRODUCT
 app.put('/product/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, image, category, new_price, old_price, available } = req.body;
-        const parsedNewPrice =
-            new_price !== undefined ? Number(new_price) : undefined;
-        const parsedOldPrice =
-            old_price !== undefined ? Number(old_price) : undefined;
+        let { name, image, category, new_price, old_price, available } = req.body;
 
-        if (
-            (parsedNewPrice !== undefined && Number.isNaN(parsedNewPrice)) ||
-            (parsedOldPrice !== undefined && Number.isNaN(parsedOldPrice))
-        ) {
-            return res.status(400).json({ success: false, message: 'Price must be a number.' });
+        const fields = [];
+        const values = [];
+        let idx = 1;
+
+        if (name !== undefined) {
+            fields.push(`name = $${idx++}`);
+            values.push(name);
         }
-        const updatePayload = {
-            ...(name !== undefined && { name }),
-            ...(image !== undefined && { image }),
-            ...(category !== undefined && { category }),
-            ...(parsedNewPrice !== undefined && { new_price: parsedNewPrice }),
-            ...(parsedOldPrice !== undefined && { old_price: parsedOldPrice }),
-            ...(available !== undefined && { available }),
-        };
+        if (image !== undefined) {
+            fields.push(`image = $${idx++}`);
+            values.push(image);
+        }
+        if (category !== undefined) {
+            fields.push(`category = $${idx++}`);
+            values.push(category);
+        }
+        if (new_price !== undefined) {
+            const parsedNew = Number(new_price);
+            if (Number.isNaN(parsedNew)) {
+                return res.status(400).json({ success: false, message: 'Price must be a number.' });
+            }
+            fields.push(`new_price = $${idx++}`);
+            values.push(parsedNew);
+        }
+        if (old_price !== undefined) {
+            const parsedOld = Number(old_price);
+            if (Number.isNaN(parsedOld)) {
+                return res.status(400).json({ success: false, message: 'Price must be a number.' });
+            }
+            fields.push(`old_price = $${idx++}`);
+            values.push(parsedOld);
+        }
+        if (available !== undefined) {
+            fields.push(`available = $${idx++}`);
+            values.push(available);
+        }
 
-        const product = await Product.findOneAndUpdate({ id: Number(id) }, updatePayload, {
-            new: true,
-            runValidators: true,
-        });
+        if (fields.length === 0) {
+            return res.status(400).json({ success: false, message: 'No fields to update.' });
+        }
 
-        if (!product) {
+        values.push(Number(id));
+        const query = `UPDATE products SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
+
+        const result = await pool.query(query, values);
+
+        if (result.rowCount === 0) {
             return res.status(404).json({ success: false, message: 'Product not found.' });
         }
 
-        res.json({ success: true, product });
+        res.json({ success: true, product: result.rows[0] });
     } catch (error) {
         console.error('Error updating product', error);
         res.status(500).json({ success: false, message: 'Unable to update product.' });
     }
 });
 
-// Creating API for getting
+// GET ALL PRODUCTS
 app.get('/allproducts', async (req, res) => {
     try {
-        const products = await Product.find({}).sort({ date: -1 });
-        res.json(products);
+        const result = await pool.query('SELECT * FROM products ORDER BY date DESC');
+        res.json(result.rows);
     } catch (error) {
         console.error('Error fetching products', error);
         res.status(500).json({ success: false, message: 'Unable to fetch products.' });
     }
 });
 
+// ================== AUTH & USERS ==================
+
+// REGISTER
 app.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        let { name, email, password } = req.body;
         if (!name || !email || !password) {
             return res.status(400).json({ success: false, message: 'Missing required registration fields.' });
         }
 
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
+        email = email.toLowerCase();
+
+        const existingUser = await pool.query(
+            'SELECT id FROM users WHERE email = $1',
+            [email]
+        );
+        if (existingUser.rowCount > 0) {
             return res.status(400).json({ success: false, message: 'Email already registered.' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ name, email, password: hashedPassword });
-        await user.save();
 
-        const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+        const result = await pool.query(
+            `INSERT INTO users (name, email, password)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, email, status, created_at`,
+            [name, email, hashedPassword]
+        );
+
+        const user = result.rows[0];
+
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
         res.json({
             success: true,
             token,
             user: {
-                id: user._id,
+                id: user.id,
                 name: user.name,
                 email: user.email,
                 status: user.status,
-                createdAt: user.createdAt,
+                createdAt: user.created_at,
             },
         });
     } catch (error) {
@@ -283,18 +243,26 @@ app.post('/register', async (req, res) => {
     }
 });
 
-
+// LOGIN
 app.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Missing login credentials.' });
         }
 
-        const user = await User.findOne({ email });
-        if (!user) {
+        email = email.toLowerCase();
+
+        const result = await pool.query(
+            'SELECT * FROM users WHERE email = $1',
+            [email]
+        );
+
+        if (result.rowCount === 0) {
             return res.status(401).json({ success: false, message: 'Invalid email or password.' });
         }
+
+        const user = result.rows[0];
 
         if (user.status === 'suspended') {
             return res.status(403).json({ success: false, message: 'Account is suspended.' });
@@ -305,17 +273,17 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid email or password.' });
         }
 
-        const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
         res.json({
             success: true,
             token,
             user: {
-                id: user._id,
+                id: user.id,
                 name: user.name,
                 email: user.email,
                 status: user.status,
-                createdAt: user.createdAt,
+                createdAt: user.created_at,
             },
         });
     } catch (error) {
@@ -324,115 +292,21 @@ app.post('/login', async (req, res) => {
     }
 });
 
-const formatOrderResponse = (order) => ({
-    orderId: order.orderId,
-    status: order.status,
-    total: order.total,
-    createdAt: order.createdAt,
-    customer: order.customer
-        ? {
-            id: order.customer._id,
-            name: order.customer.name,
-            email: order.customer.email,
-            status: order.customer.status,
-        }
-        : {
-            name: order.customerName,
-            email: order.customerEmail,
-        },
-    items: order.items || [],
-});
-
-app.get('/orders', async (req, res) => {
-    try {
-        const orders = await Order.find({}).sort({ createdAt: -1 }).populate('customer', 'name email status');
-        res.json({ success: true, orders: orders.map(formatOrderResponse) });
-    } catch (error) {
-        console.error('Error fetching orders', error);
-        res.status(500).json({ success: false, message: 'Unable to fetch orders.' });
-    }
-});
-
-app.post('/orders', async (req, res) => {
-    try {
-        const { customerId, customerName, customerEmail, items = [], total = 0, status = 'pending' } = req.body;
-        const allowedStatuses = ['pending', 'processing', 'shipped'];
-        const normalizedStatus = allowedStatuses.includes(status) ? status : 'pending';
-        const lastOrder = await Order.findOne({}).sort({ orderId: -1 }).lean();
-        const orderId = lastOrder ? lastOrder.orderId + 1 : 1;
-
-        let customerRef = null;
-        let resolvedName = customerName;
-        let resolvedEmail = customerEmail;
-
-        if (customerId) {
-            const customer = await User.findById(customerId).lean();
-            if (customer) {
-                customerRef = customer._id;
-                resolvedName = customer.name;
-                resolvedEmail = customer.email;
-            }
-        }
-
-        const sanitizedItems = Array.isArray(items)
-            ? items.map((item) => ({
-                productId: item.productId,
-                name: item.name,
-                quantity: Number(item.quantity) || 0,
-                price: Number(item.price) || 0,
-            }))
-            : [];
-
-        const parsedTotal = Number(total) || 0;
-
-        const order = new Order({
-            orderId,
-            customer: customerRef,
-            customerName: resolvedName,
-            customerEmail: resolvedEmail,
-            items: sanitizedItems,
-            total: parsedTotal,
-            status: normalizedStatus,
-        });
-
-        await order.save();
-        const populatedOrder = await order.populate('customer', 'name email status');
-        res.json({ success: true, order: formatOrderResponse(populatedOrder) });
-    } catch (error) {
-        console.error('Error creating order', error);
-        res.status(500).json({ success: false, message: 'Unable to create order.' });
-    }
-});
-
-app.patch('/orders/:orderId', async (req, res) => {
-    try {
-        const { orderId } = req.params;
-        const { status } = req.body;
-
-        if (!['pending', 'processing', 'shipped'].includes(status)) {
-            return res.status(400).json({ success: false, message: 'Invalid order status.' });
-        }
-
-        const order = await Order.findOneAndUpdate(
-            { orderId: Number(orderId) },
-            { status },
-            { new: true }
-        ).populate('customer', 'name email status');
-
-        if (!order) {
-            return res.status(404).json({ success: false, message: 'Order not found.' });
-        }
-
-        res.json({ success: true, order: formatOrderResponse(order) });
-    } catch (error) {
-        console.error('Error updating order', error);
-        res.status(500).json({ success: false, message: 'Unable to update order.' });
-    }
-});
-
+// GET USERS (không trả password)
 app.get('/users', async (req, res) => {
     try {
-        const users = await User.find({}, '-password').sort({ createdAt: -1 });
+        const result = await pool.query(
+            'SELECT id, name, email, status, created_at FROM users ORDER BY created_at DESC'
+        );
+
+        const users = result.rows.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            status: u.status,
+            createdAt: u.created_at,
+        }));
+
         res.json({ success: true, users });
     } catch (error) {
         console.error('Error fetching users', error);
@@ -440,6 +314,7 @@ app.get('/users', async (req, res) => {
     }
 });
 
+// UPDATE USER STATUS
 app.patch('/users/:userId/status', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -449,72 +324,316 @@ app.patch('/users/:userId/status', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid user status.' });
         }
 
-        const user = await User.findByIdAndUpdate(
-            userId,
-            { status },
-            { new: true, projection: '-password' }
+        const result = await pool.query(
+            `UPDATE users
+       SET status = $1
+       WHERE id = $2
+       RETURNING id, name, email, status, created_at`,
+            [status, Number(userId)]
         );
 
-        if (!user) {
+        if (result.rowCount === 0) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        res.json({ success: true, user });
+        const user = result.rows[0];
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                status: user.status,
+                createdAt: user.created_at,
+            },
+        });
     } catch (error) {
         console.error('Error updating user status', error);
         res.status(500).json({ success: false, message: 'Unable to update user status.' });
     }
 });
 
-const Users = mongoose.model('Users', {
-    name: {
-        type: String,
-    },
-    email: {
-        type: String,
-        uniqe: true,
-    },
-    password: {
-        type: String,
-    },
-    cartData: {
-        type: Object,
-    },
-    date: {
-        type: Date,
-        default: Date.now,
+// ================== AUTH MIDDLEWARE ==================
+const fetchuser = (req, res, next) => {
+    try {
+        const token = req.header('auth-token');
+        if (!token) {
+            return res.status(401).json({ error: "No token, authorization denied" });
+        }
+        const data = jwt.verify(token, JWT_SECRET);
+        req.user = data; // { id, email }
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: "Token is not valid" });
+    }
+};
+
+// ================== CART (cart_data JSONB trong users) ==================
+app.post('/addtocart', fetchuser, async (req, res) => {
+    try {
+        const { itemId, size } = req.body;
+        if (!size) return res.status(400).send({ error: "Size is required" });
+
+        const userResult = await pool.query(
+            'SELECT id, cart_data FROM users WHERE id = $1',
+            [req.user.id]
+        );
+
+        if (userResult.rowCount === 0) {
+            return res.status(404).send({ error: "User not found" });
+        }
+
+        const user = userResult.rows[0];
+        const cartData = user.cart_data || {};
+        const key = `${itemId}-${size}`;
+
+        cartData[key] = (cartData[key] || 0) + 1;
+
+        await pool.query(
+            'UPDATE users SET cart_data = $1 WHERE id = $2',
+            [cartData, req.user.id]
+        );
+
+        res.send("Added");
+    } catch (error) {
+        console.error('Error add to cart', error);
+        res.status(500).send({ error: "Server error" });
     }
 });
 
-
-
-app.post('/addtocart', fetchuser, async (req, res) => {
-    const { itemId, size } = req.body;
-    if (!size) return res.status(400).send({ error: "Size is required" });
-
-    let userData = await Users.findById(req.user.id);
-    const key = `${itemId}-${size}`;
-    userData.cartData[key] = (userData.cartData[key] || 0) + 1;
-    await Users.findByIdAndUpdate(req.user.id, { cartData: userData.cartData });
-
-    res.send("Added");
-});
-
 app.post('/removefromcart', fetchuser, async (req, res) => {
-    const { itemId, size } = req.body;
-    let userData = await Users.findById(req.user.id);
-    const key = `${itemId}-${size}`;
-    if (userData.cartData[key] > 0) userData.cartData[key] -= 1;
-    await Users.findByIdAndUpdate(req.user.id, { cartData: userData.cartData });
-    res.send("Removed");
+    try {
+        const { itemId, size } = req.body;
+
+        const userResult = await pool.query(
+            'SELECT id, cart_data FROM users WHERE id = $1',
+            [req.user.id]
+        );
+
+        if (userResult.rowCount === 0) {
+            return res.status(404).send({ error: "User not found" });
+        }
+
+        const user = userResult.rows[0];
+        const cartData = user.cart_data || {};
+        const key = `${itemId}-${size}`;
+
+        if (cartData[key] > 0) {
+            cartData[key] -= 1;
+            if (cartData[key] <= 0) {
+                delete cartData[key];
+            }
+        }
+
+        await pool.query(
+            'UPDATE users SET cart_data = $1 WHERE id = $2',
+            [cartData, req.user.id]
+        );
+
+        res.send("Removed");
+    } catch (error) {
+        console.error('Error remove from cart', error);
+        res.status(500).send({ error: "Server error" });
+    }
 });
 
+// ================== ORDERS ==================
+const formatOrderResponse = (order, items = []) => ({
+    orderId: order.order_id,
+    status: order.status,
+    total: Number(order.total),
+    createdAt: order.created_at,
+    customer: order.customer_id
+        ? {
+            id: order.customer_id,
+            name: order.user_name || order.customer_name,
+            email: order.user_email || order.customer_email,
+            status: order.user_status || 'active',
+        }
+        : {
+            name: order.customer_name,
+            email: order.customer_email,
+        },
+    items: items.map(item => ({
+        productId: item.product_id,
+        name: item.name,
+        quantity: item.quantity,
+        price: Number(item.price),
+    })),
+});
 
+// GET ORDERS
+app.get('/orders', async (req, res) => {
+    try {
+        const ordersResult = await pool.query(
+            `SELECT o.*, u.name AS user_name, u.email AS user_email, u.status AS user_status
+       FROM orders o
+       LEFT JOIN users u ON o.customer_id = u.id
+       ORDER BY o.created_at DESC`
+        );
 
+        const orders = ordersResult.rows;
 
+        if (orders.length === 0) {
+            return res.json({ success: true, orders: [] });
+        }
 
+        const orderPkIds = orders.map(o => o.id);
 
-// Start server
+        const itemsResult = await pool.query(
+            `SELECT * FROM order_items WHERE order_id = ANY($1::int[])`,
+            [orderPkIds]
+        );
+
+        const itemsByOrderId = {};
+        for (const item of itemsResult.rows) {
+            if (!itemsByOrderId[item.order_id]) {
+                itemsByOrderId[item.order_id] = [];
+            }
+            itemsByOrderId[item.order_id].push(item);
+        }
+
+        const formatted = orders.map(order =>
+            formatOrderResponse(order, itemsByOrderId[order.id] || [])
+        );
+
+        res.json({ success: true, orders: formatted });
+    } catch (error) {
+        console.error('Error fetching orders', error);
+        res.status(500).json({ success: false, message: 'Unable to fetch orders.' });
+    }
+});
+
+// CREATE ORDER
+app.post('/orders', async (req, res) => {
+    try {
+        const { customerId, customerName, customerEmail, items = [], total = 0, status = 'pending' } = req.body;
+
+        const allowedStatuses = ['pending', 'processing', 'shipped'];
+        const normalizedStatus = allowedStatuses.includes(status) ? status : 'pending';
+
+        const lastOrder = await pool.query(
+            'SELECT order_id FROM orders ORDER BY order_id DESC LIMIT 1'
+        );
+        const nextOrderId = lastOrder.rowCount > 0 ? lastOrder.rows[0].order_id + 1 : 1;
+
+        let customer_id = null;
+        let resolvedName = customerName || null;
+        let resolvedEmail = customerEmail || null;
+        let user_status = null;
+
+        if (customerId) {
+            const userResult = await pool.query(
+                'SELECT id, name, email, status FROM users WHERE id = $1',
+                [customerId]
+            );
+            if (userResult.rowCount > 0) {
+                const user = userResult.rows[0];
+                customer_id = user.id;
+                resolvedName = user.name;
+                resolvedEmail = user.email;
+                user_status = user.status;
+            }
+        }
+
+        const sanitizedItems = Array.isArray(items)
+            ? items.map((item) => ({
+                product_id: item.productId,
+                name: item.name,
+                quantity: Number(item.quantity) || 0,
+                price: Number(item.price) || 0,
+            }))
+            : [];
+
+        const parsedTotal = Number(total) || 0;
+
+        const orderInsert = await pool.query(
+            `INSERT INTO orders (order_id, customer_id, customer_name, customer_email, total, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+            [nextOrderId, customer_id, resolvedName, resolvedEmail, parsedTotal, normalizedStatus]
+        );
+
+        const orderDb = orderInsert.rows[0];
+
+        for (const item of sanitizedItems) {
+            await pool.query(
+                `INSERT INTO order_items (order_id, product_id, name, quantity, price)
+         VALUES ($1, $2, $3, $4, $5)`,
+                [orderDb.id, item.product_id, item.name, item.quantity, item.price]
+            );
+        }
+
+        const formatted = formatOrderResponse(
+            {
+                ...orderDb,
+                user_name: resolvedName,
+                user_email: resolvedEmail,
+                user_status: user_status,
+            },
+            sanitizedItems.map(i => ({
+                product_id: i.product_id,
+                name: i.name,
+                quantity: i.quantity,
+                price: i.price,
+            }))
+        );
+
+        res.json({ success: true, order: formatted });
+    } catch (error) {
+        console.error('Error creating order', error);
+        res.status(500).json({ success: false, message: 'Unable to create order.' });
+    }
+});
+
+// UPDATE ORDER STATUS
+app.patch('/orders/:orderId', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { status } = req.body;
+
+        const allowedStatuses = ['pending', 'processing', 'shipped'];
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid order status.' });
+        }
+
+        const updateResult = await pool.query(
+            'UPDATE orders SET status = $1 WHERE order_id = $2 RETURNING id',
+            [status, Number(orderId)]
+        );
+
+        if (updateResult.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Order not found.' });
+        }
+
+        const orderPkId = updateResult.rows[0].id;
+
+        const orderResult = await pool.query(
+            `SELECT o.*, u.name AS user_name, u.email AS user_email, u.status AS user_status
+       FROM orders o
+       LEFT JOIN users u ON o.customer_id = u.id
+       WHERE o.id = $1`,
+            [orderPkId]
+        );
+
+        const orderRow = orderResult.rows[0];
+
+        const itemsResult = await pool.query(
+            'SELECT * FROM order_items WHERE order_id = $1',
+            [orderPkId]
+        );
+
+        const formatted = formatOrderResponse(orderRow, itemsResult.rows);
+
+        res.json({ success: true, order: formatted });
+    } catch (error) {
+        console.error('Error updating order', error);
+        res.status(500).json({ success: false, message: 'Unable to update order.' });
+    }
+});
+
+// ================== START SERVER ==================
 app.listen(port, (error) => {
     if (!error) console.log(`Server is running on port ${port}`);
     else console.log("Error occurred, server can't start", error);
