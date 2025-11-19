@@ -73,11 +73,16 @@ const CartItems = () => {
       </div>
       <hr />
       {loadingProducts && <p className='cartitems-loading'>Đang tải sản phẩm...</p>}
+
       {!loadingProducts &&
-        products.map((product) => {
-          if (cartItems[product.id] > 0) {
+        Object.entries(cartItems).map(([key, quantity]) => {
+          if (quantity > 0) {
+            const [productId, size] = key.split('-')
+            const product = products.find(p => p.id === Number(productId))
+            if (!product) return null
+
             return (
-              <div key={product.id}>
+              <div key={key}>
                 <div className='cartiems-format cartitems-format-main'>
                   <img
                     src={resolveImageUrl(product.image)}
@@ -108,6 +113,7 @@ const CartItems = () => {
                     src={remove_icon}
                     onClick={() => setCartItemQuantity(product.id, 0)}
                     alt='Xoá khỏi giỏ'
+                    style={{ cursor: 'pointer' }}
                   />
                 </div>
                 <hr />
@@ -115,7 +121,9 @@ const CartItems = () => {
             )
           }
           return null
-        })}
+        })
+      }
+
       <div className='cartitems-down'>
         <div className='cartitems-total'>
           <h1>Tổng giỏ hàng</h1>

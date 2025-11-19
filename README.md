@@ -2,7 +2,7 @@
 
 This repository contains three separate apps that work together:
 
-- `backend/` – Express + MongoDB API server.
+- `backend/` – Express + PostgreSQL API server.
 - `admin/` – React (Vite) admin dashboard.
 - `frontend/` – React storefront built with Create React App.
 
@@ -69,7 +69,8 @@ It will spawn three background processes (backend, admin, storefront) and tail t
 
 ## 4. Environment variables
 
-- The backend expects the standard MongoDB connection variables (see `backend/index.js`). Create a `.env` file in `backend/` with `MONGODB_URI` and any other secrets you need.
+- The backend expects PostgreSQL connection variables (see `backend/index.js`). Create a `.env` file in `backend/` with PostgreSQL credentials (user, password, host, port, database).
+- Ensure PostgreSQL is running and the database exists with the required tables schema.
 - The frontends read their configuration from their respective `.env` files if needed (e.g. API base URL).
 
 ## Troubleshooting

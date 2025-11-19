@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState } from 'react'
+import React, { useContext, useRef, useState, useEffect } from 'react'
 import './Navbar.css'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -9,7 +9,6 @@ import nav_dropdown from '../assests/nav_dropdown.png'
 import { AuthContext } from '../../Context/AuthContext'
 
 const Navbar = () => {
-
     const [menu, setMenu] = useState("Cửa hàng")
     const { getTotalCartItems } = useContext(ShopContext);
     const menuRef = useRef();
@@ -17,8 +16,8 @@ const Navbar = () => {
     const { user, logout } = useContext(AuthContext);
 
     const dropdown_toggle = (e) => {
-        menuRef.current.classList.toggle('nav-menu-visible');
-        e.target.classList.toggle('open');
+        menuRef.current.classList.toggle('nav-menu-visible')
+        e.target.classList.toggle('open')
     }
 
     const handleLogout = () => {
@@ -34,7 +33,7 @@ const Navbar = () => {
             </div>
             <img className='nav-dropdown' onClick={dropdown_toggle} src={nav_dropdown} alt="" />
             <ul ref={menuRef} className="nav-menu">
-                <li onClick={() => { setMenu("Của hàng") }}><Link to='/' style={{ textDecoration: 'none' }} >Cửa hàng</Link>{menu === "Của hàng" ? <hr /> : <></>}</li>
+                <li onClick={() => { setMenu("Cửa hàng") }}><Link to='/' style={{ textDecoration: 'none' }} >Cửa hàng</Link>{menu === "Cửa hàng" ? <hr /> : <></>}</li>
                 <li onClick={() => { setMenu("Đàn ông") }}><Link to='/mens' style={{ textDecoration: 'none' }} >Đàn ông</Link>{menu === "Đàn ông" ? <hr /> : <></>}</li>
                 <li onClick={() => { setMenu("Phụ nữ") }}><Link to='/womens' style={{ textDecoration: 'none' }} >Phụ nữ</Link>{menu === "Phụ nữ" ? <hr /> : <></>}</li>
                 <li onClick={() => { setMenu("Trẻ em") }}><Link to='/kids' style={{ textDecoration: 'none' }} >Trẻ em</Link>{menu === "Trẻ em" ? <hr /> : <></>}</li>

@@ -1,14 +1,13 @@
-import React, { useContext } from 'react'
+import React, { useContext, useState } from 'react'
 import './CSS/ShopCategory.css'
 import { ShopContext } from '../Context/ShopContext'
 import dropdown_icon from '../Components/assests/dropdown_icon.png'
 import Item from '../Components/Item/Item'
 
 const ShopCategory = (props) => {
-  const { products, loadingProducts } = useContext(ShopContext)
-  const filteredProducts = products.filter(
-    (item) => item.category === props.category
-  )
+    const { products, loadingProducts } = useContext(ShopContext)
+    const [sortType, setSortType] = useState('default')
+    const [searchTerm, setSearchTerm] = useState('')
 
   return (
     <div className='shop-category'>

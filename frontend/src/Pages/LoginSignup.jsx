@@ -13,6 +13,8 @@ const LoginSignup = () => {
   const navigate = useNavigate()
   const { login: authenticate } = useContext(AuthContext)
 
+  const navigate = useNavigate()
+
   const toggleMode = () => {
     setMode((prev) => (prev === 'signup' ? 'login' : 'signup'))
     setError('')
