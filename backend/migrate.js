@@ -16,7 +16,7 @@ const pgPool = new Pool({
     user: 'postgres',
     host: 'localhost',
     database: 'clothify', // đúng tên DB bạn tạo
-    password: 'kt123456', // mật khẩu postgres của bạn
+    password: '123123', // mật khẩu postgres của bạn
     port: 5432,
 });
 
