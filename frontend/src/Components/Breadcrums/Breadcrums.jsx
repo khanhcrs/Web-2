@@ -12,7 +12,7 @@ const Breadcrums = (props) => {
 
     return (
         <div className='breadcrums'>
-            HOME <img src={arrow_icon} alt="" /> SHOP <img src={arrow_icon} alt="" />{product.category} <img src={arrow_icon} alt="" />{product.name}
+            TRANG CHỦ <img src={arrow_icon} alt="" /> CỬA HÀNG <img src={arrow_icon} alt="" />{product.category} <img src={arrow_icon} alt="" />{product.name}
         </div>
     )
 }
