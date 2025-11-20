@@ -18,6 +18,8 @@ const ShopContextProvider = (props) => {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [error, setError] = useState('');
 
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [userName, setUserName] = useState(
     localStorage.getItem('user_name')
   );
@@ -151,6 +153,8 @@ const ShopContextProvider = (props) => {
     loadingProducts,
     productError: error,
     userName,
+    searchTerm,
+    setSearchTerm,
 
     // cart helpers
     getTotalCartItems,

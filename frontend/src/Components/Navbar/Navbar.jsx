@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState, useEffect } from 'react'
+import React, { useContext, useRef, useState } from 'react'
 import './Navbar.css'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -10,7 +10,7 @@ import { AuthContext } from '../../Context/AuthContext'
 
 const Navbar = () => {
     const [menu, setMenu] = useState("Cửa hàng")
-    const { getTotalCartItems } = useContext(ShopContext);
+    const { getTotalCartItems, searchTerm, setSearchTerm } = useContext(ShopContext);
     const menuRef = useRef();
     const navigate = useNavigate();
     const { user, logout } = useContext(AuthContext);
@@ -23,6 +23,10 @@ const Navbar = () => {
     const handleLogout = () => {
         logout();
         navigate('/login');
+    }
+
+    const handleSearchSubmit = (event) => {
+        event.preventDefault();
     }
 
     return (
@@ -38,17 +42,29 @@ const Navbar = () => {
                 <li onClick={() => { setMenu("Phụ nữ") }}><Link to='/womens' style={{ textDecoration: 'none' }} >Phụ nữ</Link>{menu === "Phụ nữ" ? <hr /> : <></>}</li>
                 <li onClick={() => { setMenu("Trẻ em") }}><Link to='/kids' style={{ textDecoration: 'none' }} >Trẻ em</Link>{menu === "Trẻ em" ? <hr /> : <></>}</li>
             </ul>
-            <div className="nav-login-cart">
-                {user ? (
-                    <>
-                        <span className='nav-user-name'>Xin chào, {user.name}</span>
-                        <button onClick={handleLogout}>Đăng xuất</button>
-                    </>
-                ) : (
-                    <Link to='/login'><button>Đăng nhập</button></Link>
-                )}
-                <Link to='/cart'><img src={cart_icon} alt='' /></Link>
-                <div className="nav-cart-count">{getTotalCartItems()}</div>
+            <div className="nav-actions">
+                <form className='nav-search' onSubmit={handleSearchSubmit}>
+                    <input
+                        type="text"
+                        className='nav-search-input'
+                        placeholder='Tìm sản phẩm...'
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </form>
+
+                <div className="nav-login-cart">
+                    {user ? (
+                        <>
+                            <span className='nav-user-name'>Xin chào, {user.name}</span>
+                            <button onClick={handleLogout}>Đăng xuất</button>
+                        </>
+                    ) : (
+                        <Link to='/login'><button>Đăng nhập</button></Link>
+                    )}
+                    <Link to='/cart'><img src={cart_icon} alt='' /></Link>
+                    <div className="nav-cart-count">{getTotalCartItems()}</div>
+                </div>
             </div>
         </div>
     )
