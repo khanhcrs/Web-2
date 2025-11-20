@@ -47,3 +47,4 @@ export const NewCollections = () => {
     </div>
   )
 }
+export default NewCollections
