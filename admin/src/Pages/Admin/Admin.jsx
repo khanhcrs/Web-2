@@ -11,16 +11,14 @@ const Admin = () => {
   return (
     <div className='admin'>
       <Sidebar />
-      <div className='admin-content'>
-        <Routes>
-          <Route path='/' element={<Dashboard />} />
-          <Route index element={<Dashboard />} />
-          <Route path='/addproduct' element={<AddProduct />} />
-          <Route path='/listproduct' element={<ListProduct />} />
-          <Route path='/ordermanagement' element={<OrderManagement />} />
-          <Route path='*' element={<Dashboard />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path='/' element={<Dashboard />} />
+        <Route index element={<Dashboard />} />
+        <Route path='/addproduct' element={<AddProduct />} />
+        <Route path='/listproduct' element={<ListProduct />} />
+        <Route path='/ordermanagement' element={<OrderManagement />} />
+        <Route path='*' element={<Dashboard />} />
+      </Routes>
     </div>
   )
 }
