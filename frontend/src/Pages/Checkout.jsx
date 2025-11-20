@@ -41,14 +41,24 @@ const Checkout = () => {
 
   const items = useMemo(
     () =>
-      products
-        .filter((product) => cartItems[product.id] > 0)
-        .map((product) => ({
-          id: product.id,
-          name: product.name,
-          price: product.new_price,
-          quantity: cartItems[product.id]
-        })),
+      Object.entries(cartItems)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([key, quantity]) => {
+          const [productId, size] = key.split('-')
+          const product = products.find((productItem) => productItem.id === Number(productId))
+
+          if (!product) return null
+
+          return {
+            id: product.id,
+            key,
+            name: product.name,
+            price: product.new_price,
+            quantity,
+            size: size !== 'default' ? size : null
+          }
+        })
+        .filter(Boolean),
     [products, cartItems]
   )
 
@@ -139,7 +149,8 @@ const Checkout = () => {
           productId: item.id,
           name: item.name,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          ...(item.size ? { size: item.size } : {})
         })),
         total
       }
@@ -198,7 +209,10 @@ const Checkout = () => {
           <div className='checkout-success-items'>
             {order.items.map((item) => (
               <div key={`${order.orderId}-${item.productId}`} className='checkout-success-item'>
-                <span>{item.name}</span>
+                <div>
+                  <span>{item.name}</span>
+                  {item.size && <div className='checkout-success-item-size'>Kích thước: {item.size}</div>}
+                </div>
                 <span>x{item.quantity}</span>
                 <span>{formatCurrency(item.price * item.quantity)}</span>
               </div>
@@ -225,9 +239,10 @@ const Checkout = () => {
             <h2>Đơn hàng của bạn</h2>
             <div className='checkout-summary-items'>
               {items.map((item) => (
-                <div key={item.id} className='checkout-summary-item'>
+                <div key={item.key} className='checkout-summary-item'>
                   <div>
                     <p className='checkout-summary-item-name'>{item.name}</p>
+                    {item.size && <p className='checkout-summary-item-size'>Kích thước: {item.size}</p>}
                     <p className='checkout-summary-item-qty'>Số lượng: {item.quantity}</p>
                   </div>
                   <span>{formatCurrency(item.price * item.quantity)}</span>

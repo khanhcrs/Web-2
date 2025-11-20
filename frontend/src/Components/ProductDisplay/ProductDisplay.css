@@ -74,6 +74,12 @@
     gap: 20px;
 }
 
+.productdisplay-size-error {
+    margin: -12px 0 16px 0;
+    color: #ff4141;
+    font-size: 14px;
+}
+
 .productdisplay-size-option {
     padding: 18px 24px;
     background: #fbfbfb;

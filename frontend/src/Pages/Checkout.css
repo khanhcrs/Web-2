@@ -50,6 +50,7 @@
   margin-bottom: 6px;
 }
 
+.checkout-summary-item-size,
 .checkout-summary-item-qty {
   color: #777;
   font-size: 14px;
@@ -182,6 +183,11 @@
   justify-content: space-between;
   gap: 12px;
   color: #333;
+}
+
+.checkout-success-item-size {
+  color: #777;
+  font-size: 14px;
 }
 
 .checkout-success-total {

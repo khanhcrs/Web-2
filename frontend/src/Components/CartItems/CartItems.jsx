@@ -89,29 +89,34 @@ const CartItems = () => {
                     alt={product.name}
                     className='carticon-product-icon'
                   />
-                  <p>{product.name}</p>
+                  <div>
+                    <p>{product.name}</p>
+                    {size && size !== 'default' && (
+                      <p className='cartitems-size'>Kích thước: {size}</p>
+                    )}
+                  </div>
                   <p>{formatCurrency(product.new_price)}</p>
                   <div className='cartitems-quantity-control'>
                     <button
                       type='button'
-                      onClick={() => removeFromCart(product.id)}
+                      onClick={() => removeFromCart(product.id, size)}
                       aria-label='Giảm số lượng'
                     >
                       −
                     </button>
-                    <span>{cartItems[product.id]}</span>
+                    <span>{quantity}</span>
                     <button
                       type='button'
-                      onClick={() => addToCart(product.id)}
+                      onClick={() => addToCart(product.id, size)}
                       aria-label='Tăng số lượng'
                     >
                       +
                     </button>
                   </div>
-                  <p>{formatCurrency(product.new_price * cartItems[product.id])}</p>
+                  <p>{formatCurrency(product.new_price * quantity)}</p>
                   <img
                     src={remove_icon}
-                    onClick={() => setCartItemQuantity(product.id, 0)}
+                    onClick={() => setCartItemQuantity(product.id, size, 0)}
                     alt='Xoá khỏi giỏ'
                     style={{ cursor: 'pointer' }}
                   />

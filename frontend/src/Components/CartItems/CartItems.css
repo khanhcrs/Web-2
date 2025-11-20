@@ -64,6 +64,12 @@
     font-weight: 600;
 }
 
+.cartitems-size {
+    margin-top: 6px;
+    font-size: 14px;
+    color: #777;
+}
+
 .cartitems-format {
     font-size: 17px;
     font-weight: 600;

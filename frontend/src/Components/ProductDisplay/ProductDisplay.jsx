@@ -13,6 +13,7 @@ const ProductDisplay = (props) => {
   const [selectedSize, setSelectedSize] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
+  const [sizeError, setSizeError] = useState('')
   const navigate = useNavigate()
 
   const sizeOptions = useMemo(() => ['S', 'M', 'L', 'XL', 'XXL'], [])
@@ -22,7 +23,13 @@ const ProductDisplay = (props) => {
   }
 
   const handleAddToCart = () => {
-    addToCart(product.id, quantity)
+    if (!selectedSize) {
+      setSizeError('Vui lòng chọn kích thước trước khi thêm vào giỏ hàng.')
+      return
+    }
+
+    setSizeError('')
+    addToCart(product.id, selectedSize, quantity)
     setIsFeedbackModalOpen(true)
   }
 
@@ -91,12 +98,16 @@ const ProductDisplay = (props) => {
                     ? 'productdisplay-size-option selected'
                     : 'productdisplay-size-option'
                 }
-                onClick={() => setSelectedSize(size)}
+                onClick={() => {
+                  setSelectedSize(size)
+                  setSizeError('')
+                }}
               >
                 {size}
               </button>
             ))}
           </div>
+          {sizeError && <p className='productdisplay-size-error'>{sizeError}</p>}
         </div>
         <div className='productdisplay-quantity'>
           <span>Số lượng</span>
@@ -145,10 +156,13 @@ const ProductDisplay = (props) => {
                 src={productImage}
                 alt={product.name}
               />
-              <div className='productdisplay-feedback-product-details'>
-                <p className='productdisplay-feedback-product'>{product.name}</p>
-                <p className='productdisplay-feedback-quantity'>Số lượng: {quantity}</p>
-              </div>
+            <div className='productdisplay-feedback-product-details'>
+              <p className='productdisplay-feedback-product'>{product.name}</p>
+              {selectedSize && (
+                <p className='productdisplay-feedback-size'>Kích thước: {selectedSize}</p>
+              )}
+              <p className='productdisplay-feedback-quantity'>Số lượng: {quantity}</p>
+            </div>
             </div>
             <div className='productdisplay-feedback-actions'>
               <button type='button' className='continue' onClick={handleContinueShopping}>
