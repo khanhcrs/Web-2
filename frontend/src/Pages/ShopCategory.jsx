@@ -4,9 +4,8 @@ import { ShopContext } from '../Context/ShopContext';
 import Item from '../Components/Item/Item';
 
 const ShopCategory = (props) => {
-  const { products, loadingProducts } = useContext(ShopContext);
+  const { products, loadingProducts, searchTerm } = useContext(ShopContext);
   const [sortType, setSortType] = useState('default'); // default | price-asc | price-desc
-  const [searchTerm, setSearchTerm] = useState('');
 
   // Tạo danh sách sản phẩm đã lọc + sắp xếp
   const filteredProducts = useMemo(() => {
@@ -46,15 +45,6 @@ const ShopCategory = (props) => {
         </p>
 
         <div className="shopcategory-controls">
-          {/* Ô tìm kiếm */}
-          <input
-            type="text"
-            className="shopcategory-search"
-            placeholder="Tìm sản phẩm..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-
           {/* Chọn sắp xếp */}
           <div className="shopcategory-sort">
             <span>Sắp xếp theo:&nbsp;</span>
