@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import './OrderManagement.css'
-import CustomerManagement from '../CustomerManagement/CustomerManagement'
 import { API_BASE_URL } from '../../config'
 
 const STATUS_OPTIONS = [
@@ -226,7 +225,6 @@ const OrderManagement = () => {
             ))}
         </div>
       </section>
-      <CustomerManagement />
     </div>
   )
 }
