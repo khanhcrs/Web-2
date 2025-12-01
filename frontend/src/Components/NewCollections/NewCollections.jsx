@@ -7,28 +7,30 @@ export const NewCollections = () => {
   const { products, loadingProducts } = useContext(ShopContext)
 
   const collections = useMemo(() => {
-    if (!Array.isArray(products)) {
-      return []
-    }
+    if (!Array.isArray(products)) return []
+
     const toTimestamp = (value) => {
       if (!value) return 0
       const parsed = new Date(value)
       return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime()
     }
+
     const sorted = [...products].sort(
       (a, b) => toTimestamp(b.date) - toTimestamp(a.date)
     )
+
     return sorted.slice(0, 8)
   }, [products])
 
   return (
-    <div className='new-collections'>
+    <div className='new-collections' id='new-collections'>
       <h1>BỘ SƯU TẬP MỚI</h1>
       <hr />
       <div className='collections'>
         {loadingProducts && (
           <p className='collections-empty'>Đang tải bộ sưu tập...</p>
         )}
+
         {!loadingProducts &&
           collections.map((item) => (
             <Item
@@ -40,6 +42,7 @@ export const NewCollections = () => {
               old_price={item.old_price}
             />
           ))}
+
         {!loadingProducts && collections.length === 0 && (
           <p className='collections-empty'>Chưa có bộ sưu tập mới.</p>
         )}
@@ -47,4 +50,5 @@ export const NewCollections = () => {
     </div>
   )
 }
+
 export default NewCollections

@@ -21,9 +21,9 @@ const Shop = () => {
       )}
       <Hero />
       <Popular />
-      <Offers />
+      {/* <Offers /> */}
       <NewCollections />
-      <NewsLetter />
+      {/* <NewsLetter /> */}
     </div>
   )
 }

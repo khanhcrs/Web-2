@@ -1,61 +1,77 @@
+/* ====== VÙNG CHUNG ====== */
+
 .dashboard {
-  padding: 24px 40px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 32px 32px;
+  box-sizing: border-box;
+
   display: flex;
   flex-direction: column;
   gap: 24px;
-  width: 100%;
+
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
 }
 
 .dashboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .dashboard h1 {
   margin: 6px 0;
   font-size: 32px;
+  line-height: 1.1;
   color: #0f172a;
 }
 
 .subtitle {
   margin: 0;
-  color: #475569;
+  font-size: 14px;
+  color: #64748b;
 }
 
 .eyebrow {
   margin: 0;
   letter-spacing: 0.08em;
-  font-size: 13px;
+  font-size: 12px;
   text-transform: uppercase;
   color: #94a3b8;
   font-weight: 700;
 }
 
+/* ====== ALERT ====== */
+
 .dashboard-alert {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: 12px;
   font-weight: 600;
+  font-size: 14px;
 }
 
 .dashboard-alert.error {
   background: #fef2f2;
   color: #b91c1c;
-  border: 1px solid #fecdd3;
+  border: 1px solid #fecaca;
 }
+
+/* ====== KHỐI CHỈ SỐ TỔNG ====== */
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
 .stat-card {
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 18px 20px;
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -63,22 +79,25 @@
 
 .stat-card p {
   margin: 0;
-  color: #475569;
+  color: #64748b;
   font-weight: 600;
+  font-size: 14px;
 }
 
 .stat-card h2 {
   margin: 0;
-  font-size: 28px;
+  font-size: 26px;
+  font-weight: 800;
   color: #0f172a;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   width: fit-content;
   padding: 6px 10px;
-  border-radius: 9999px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
   background: #e2e8f0;
@@ -100,17 +119,19 @@
   color: #475569;
 }
 
+/* ====== CÁC PANEL DƯỚI ====== */
+
 .dashboard-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr);
   gap: 16px;
 }
 
 .panel {
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 20px;
-  box-shadow: 0 10px 36px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -125,20 +146,24 @@
 
 .panel-header h3 {
   margin: 6px 0 0;
+  font-size: 18px;
   color: #0f172a;
 }
 
 .panel-header .tag-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ====== TAG / CHIP ====== */
 
 .tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
-  border-radius: 9999px;
+  padding: 7px 11px;
+  border-radius: 999px;
   background: #e0f2fe;
   color: #0369a1;
   font-weight: 700;
@@ -150,9 +175,12 @@
   color: #475569;
 }
 
+/* ====== BẢNG SẢN PHẨM BÁN CHẠY ====== */
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .data-table th,
@@ -160,19 +188,27 @@
   text-align: left;
   padding: 10px 8px;
   border-bottom: 1px solid #e2e8f0;
+  font-size: 14px;
 }
 
 .data-table th {
-  font-size: 13px;
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: #94a3b8;
+  font-weight: 700;
 }
 
 .data-table td {
   color: #0f172a;
   font-weight: 600;
 }
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ====== DANH SÁCH NGƯỜI DÙNG ====== */
 
 .user-list {
   display: flex;
@@ -185,9 +221,9 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 14px;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #f8fafc;
 }
 
@@ -195,11 +231,13 @@
   margin: 0;
   font-weight: 700;
   color: #0f172a;
+  font-size: 14px;
 }
 
 .user-email {
   margin: 2px 0 0;
-  color: #475569;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .user-meta {
@@ -210,7 +248,7 @@
 
 .status-pill {
   padding: 6px 10px;
-  border-radius: 9999px;
+  border-radius: 999px;
   font-weight: 700;
   font-size: 12px;
   background: #e0f2fe;
@@ -225,17 +263,42 @@
 .user-date {
   color: #475569;
   font-weight: 600;
+  font-size: 13px;
 }
+
+/* ====== TRẠNG THÁI RỖNG ====== */
 
 .empty {
-  margin: 0;
+  margin: 4px 0 0;
   color: #94a3b8;
   font-weight: 600;
+  font-size: 14px;
 }
 
-@media (max-width: 900px) {
+/* ====== RESPONSIVE ====== */
+
+@media (max-width: 1024px) {
   .dashboard {
-    padding: 20px;
+    padding: 20px 20px 28px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .user-row {
@@ -244,14 +307,12 @@
   }
 }
 
-@media (max-width: 640px) {
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 16px 14px 24px;
   }
 
-  .panel-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .stat-card h2 {
+    font-size: 22px;
   }
 }
