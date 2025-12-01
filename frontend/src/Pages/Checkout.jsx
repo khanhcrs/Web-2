@@ -47,7 +47,7 @@ const Checkout = () => {
     setFormData((prev) => ({
       ...prev,
       name: prev.name || user.name || '',
-      email: prev.email || user.email || ''
+      email: user.email || ''
     }))
   }, [user])
 
@@ -75,6 +75,7 @@ const Checkout = () => {
   )
 
   const hasItems = items.length > 0
+  const isEmailSynced = Boolean(user?.email)
   const total = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items]
@@ -82,6 +83,10 @@ const Checkout = () => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target
+
+    if (name === 'email' && user?.email) {
+      return
+    }
 
     if (name === 'cardNumber') {
       const digits = value.replace(/\D/g, '').slice(0, 19)
@@ -285,9 +290,10 @@ const Checkout = () => {
                 name='email'
                 type='email'
                 value={formData.email}
-                onChange={handleInputChange}
+                onChange={isEmailSynced ? undefined : handleInputChange}
                 placeholder='email@domain.com'
                 autoComplete='email'
+                readOnly={isEmailSynced}
                 required
               />
             </div>
