@@ -1,3 +1,9 @@
+import React, { useContext, useEffect, useMemo, useState } from 'react'
+import './Checkout.css'
+import { ShopContext } from '../Context/ShopContext'
+import { API_BASE_URL } from '../config'
+import { Link } from 'react-router-dom'
+import { AuthContext } from '../Context/AuthContext'
 import React, { useContext, useMemo, useState } from 'react';
 import './Checkout.css';
 import { ShopContext } from '../Context/ShopContext';
@@ -33,13 +39,12 @@ const formatCurrency = (value) => {
 };
 
 const Checkout = () => {
-  const { cartItems, products, clearCart } = useContext(ShopContext);
-  const [formData, setFormData] = useState(initialFormState);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [order, setOrder] = useState(null);
+  const { cartItems, products, clearCart } = useContext(ShopContext)
+  const [formData, setFormData] = useState(initialFormState)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [order, setOrder] = useState(null)
 
-  // build danh sách item từ cart
   const items = useMemo(
     () =>
       Object.entries(cartItems)
