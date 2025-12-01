@@ -1,14 +1,9 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import './Checkout.css'
 import { ShopContext } from '../Context/ShopContext'
 import { API_BASE_URL } from '../config'
 import { Link } from 'react-router-dom'
 import { AuthContext } from '../Context/AuthContext'
-import React, { useContext, useMemo, useState } from 'react';
-import './Checkout.css';
-import { ShopContext } from '../Context/ShopContext';
-import { API_BASE_URL } from '../config';
-import { Link } from 'react-router-dom';
 
 const initialFormState = {
   name: '',
