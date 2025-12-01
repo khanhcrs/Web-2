@@ -40,6 +40,16 @@ const Checkout = () => {
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
 
+  useEffect(() => {
+    if (!user) return
+
+    setFormData((prev) => ({
+      ...prev,
+      name: prev.name || user.name || '',
+      email: user.email || ''
+    }))
+  }, [user])
+
   const items = useMemo(
     () =>
       Object.entries(cartItems)
@@ -64,7 +74,8 @@ const Checkout = () => {
     [products, cartItems]
   );
 
-  const hasItems = items.length > 0;
+  const hasItems = items.length > 0
+  const isEmailSynced = Boolean(user?.email)
   const total = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items]
@@ -73,6 +84,10 @@ const Checkout = () => {
   // ============== FORM HANDLERS ==============
   const handleInputChange = (event) => {
     const { name, value } = event.target;
+
+    if (name === 'email' && user?.email) {
+      return
+    }
 
     if (name === 'cardNumber') {
       const digits = value.replace(/\D/g, '').slice(0, 19);
@@ -365,9 +380,10 @@ const Checkout = () => {
                 name="email"
                 type="email"
                 value={formData.email}
-                onChange={handleInputChange}
-                placeholder="email@domain.com"
-                autoComplete="email"
+                onChange={isEmailSynced ? undefined : handleInputChange}
+                placeholder='email@domain.com'
+                autoComplete='email'
+                readOnly={isEmailSynced}
                 required
               />
             </div>
