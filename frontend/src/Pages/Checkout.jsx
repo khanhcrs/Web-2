@@ -1,8 +1,9 @@
-import React, { useContext, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import './Checkout.css'
 import { ShopContext } from '../Context/ShopContext'
 import { API_BASE_URL } from '../config'
 import { Link } from 'react-router-dom'
+import { AuthContext } from '../Context/AuthContext'
 
 const initialFormState = {
   name: '',
@@ -34,10 +35,21 @@ const formatCurrency = (value) => {
 
 const Checkout = () => {
   const { cartItems, products, clearCart } = useContext(ShopContext)
+  const { user } = useContext(AuthContext)
   const [formData, setFormData] = useState(initialFormState)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
+
+  useEffect(() => {
+    if (!user) return
+
+    setFormData((prev) => ({
+      ...prev,
+      name: prev.name || user.name || '',
+      email: prev.email || user.email || ''
+    }))
+  }, [user])
 
   const items = useMemo(
     () =>
