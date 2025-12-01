@@ -1,41 +1,40 @@
-.sidebar{
-    display: flex;
-    flex-direction: column;
-    padding: 30px 0;
-    gap: 20px;
-    width: 100%;
-    max-width: 250px;
-    height: calc(100vh - 72px);
-    background: white;
-    position: sticky;
-    top: 72px;
-    box-shadow: 0 1px 3px -2px #0000001f;
+/* ====== SIDEBAR CHUNG ====== */
+.sidebar {
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.sidebar-item{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0px 20px;
-    padding: 5px 10px;
-    border-radius: 6px;
-    background: #f6f6f6;
-    gap: 20px;
-    cursor: pointer;
-}
-@media(max-width: 800px){
-    .sidebar{
-        padding: 30px 0px;
-        flex-direction: row;
-        width: 100%;
-        max-width: none;
-        height: auto;
-        justify-content: center;
-        position: static;
-        box-shadow: none;
 
-    }
-    .sidebar-item{
-       margin: 0;
-       
-    }
+/* Mỗi item (Dashboard, Add Product, ...) */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+}
+
+/* Giới hạn kích thước icon cho ĐỒNG BỘ – logo cũng bị thu nhỏ lại */
+.sidebar-item img {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* Text bên phải icon */
+.sidebar-item p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5b21b6; /* tím giống hình của bạn */
+}
+
+/* Khi hover cho cảm giác nút bấm */
+.sidebar-item:hover {
+  background: #f4f4ff;
 }

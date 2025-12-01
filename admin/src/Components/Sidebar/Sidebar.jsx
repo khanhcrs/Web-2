@@ -3,14 +3,14 @@ import './Sidebar.css'
 import { Link } from 'react-router-dom'
 import add_product_icon from '../../assets/Product_Cart.svg'
 import list_product_icon from '../../assets/Product_list_icon.svg'
-import nav_logo from '../../assets/nav-logo.svg'
+import db_icon from '../../assets/db_icon.png'
 
 export const Sidebar = () => {
   return (
     <div className='sidebar'>
       <Link to={'/'} style={{ textDecoration: 'none' }}>
         <div className='sidebar-item'>
-          <img src={nav_logo} alt='' />
+          <img src={db_icon} alt='' />
           <p>Dashboard</p>
         </div>
       </Link>

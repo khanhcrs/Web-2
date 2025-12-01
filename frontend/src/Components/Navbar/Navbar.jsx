@@ -31,10 +31,10 @@ const Navbar = () => {
 
     return (
         <div className='navbar'>
-            <div className="navbar-logo">
+            <Link to='/' className="navbar-logo">
                 <img src={logo} alt='' />
                 <p>SHOPPER</p>
-            </div>
+            </Link>
             <img className='nav-dropdown' onClick={dropdown_toggle} src={nav_dropdown} alt="" />
             <ul ref={menuRef} className="nav-menu">
                 <li onClick={() => { setMenu("Cửa hàng") }}><Link to='/' style={{ textDecoration: 'none' }} >Cửa hàng</Link>{menu === "Cửa hàng" ? <hr /> : <></>}</li>
