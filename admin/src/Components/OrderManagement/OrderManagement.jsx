@@ -30,6 +30,8 @@ const OrderManagement = () => {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -52,6 +54,34 @@ const OrderManagement = () => {
   useEffect(() => {
     fetchOrders()
   }, [fetchOrders])
+
+  const filteredOrders = orders
+    .filter((order) => {
+      if (statusFilter === 'all') return true
+      return order.status === statusFilter
+    })
+    .filter((order) => {
+      const normalizedSearch = searchTerm.trim().toLowerCase()
+      if (!normalizedSearch) return true
+
+      const searchableFields = [
+        String(order.orderId || '').toLowerCase(),
+        order.customer?.name?.toLowerCase() || '',
+        order.customer?.email?.toLowerCase() || '',
+        order.status?.toLowerCase() || ''
+      ]
+
+      if (Array.isArray(order.items)) {
+        order.items.forEach((item) => {
+          searchableFields.push(
+            item.name?.toLowerCase() || '',
+            String(item.productId || '').toLowerCase()
+          )
+        })
+      }
+
+      return searchableFields.some((field) => field.includes(normalizedSearch))
+    })
 
   const handleStatusChange = async (orderId, status) => {
     setUpdatingId(orderId)
@@ -93,6 +123,37 @@ const OrderManagement = () => {
             {loading ? 'Đang tải...' : 'Tải lại'}
           </button>
         </div>
+        <div className='order-management-filters'>
+          <div className='order-management-search'>
+            <label htmlFor='order-search'>Tìm kiếm</label>
+            <input
+              id='order-search'
+              type='search'
+              placeholder='Khách hàng, email, mã đơn, sản phẩm...'
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <div className='order-management-search'>
+            <label htmlFor='order-status-filter'>Trạng thái</label>
+            <select
+              id='order-status-filter'
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value='all'>Tất cả</option>
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className='order-management-result-count'>
+            <span>Kết quả: </span>
+            <strong>{filteredOrders.length}</strong>
+          </div>
+        </div>
         {error && <div className='order-management-alert error'>{error}</div>}
         {feedback && <div className='order-management-alert success'>{feedback}</div>}
         <div className='order-management-list'>
@@ -100,8 +161,11 @@ const OrderManagement = () => {
           {!loading && orders.length === 0 && (
             <p className='order-management-empty'>Chưa có đơn hàng nào.</p>
           )}
+          {!loading && orders.length > 0 && filteredOrders.length === 0 && (
+            <p className='order-management-empty'>Không tìm thấy kết quả phù hợp.</p>
+          )}
           {!loading &&
-            orders.map((order) => (
+            filteredOrders.map((order) => (
               <article key={order.orderId} className='order-card'>
                 <div className='order-card-header'>
                   <div>
