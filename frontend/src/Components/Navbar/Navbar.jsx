@@ -27,6 +27,14 @@ const Navbar = () => {
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
+
+        const keyword = searchTerm.trim()
+
+        if (keyword) {
+            navigate(`/search?query=${encodeURIComponent(keyword)}`)
+        } else {
+            navigate('/')
+        }
     }
 
     return (
