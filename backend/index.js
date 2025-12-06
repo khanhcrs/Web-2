@@ -9,6 +9,10 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 
 const JWT_SECRET = 'secret_ecom';
+const DEFAULT_ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@clothify.com').toLowerCase();
+const DEFAULT_ADMIN_NAME = process.env.ADMIN_NAME || 'Clothify Admin';
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
+const ALLOWED_ROLES = ['customer', 'admin'];
 
 app.use(express.json());
 app.use(cors());
@@ -32,28 +36,24 @@ const ensureSchemaAndAdminUser = async () => {
 
   await pool.query("UPDATE users SET role = 'customer' WHERE role IS NULL");
 
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@clothify.com').toLowerCase();
-  const adminName = process.env.ADMIN_NAME || 'Clothify Admin';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
-
-  const adminResult = await pool.query('SELECT id, role FROM users WHERE email = $1', [adminEmail]);
+  const adminResult = await pool.query('SELECT id, role FROM users WHERE email = $1', [DEFAULT_ADMIN_EMAIL]);
 
   if (adminResult.rowCount === 0) {
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
     await pool.query(
       `INSERT INTO users (name, email, password, status, role)
        VALUES ($1, $2, $3, 'active', 'admin')`,
-      [adminName, adminEmail, hashedPassword]
+      [DEFAULT_ADMIN_NAME, DEFAULT_ADMIN_EMAIL, hashedPassword]
     );
-    console.log(`Seeded default admin account for ${adminEmail}`);
+    console.log(`Seeded default admin account for ${DEFAULT_ADMIN_EMAIL}`);
   } else if (adminResult.rows[0].role !== 'admin') {
     await pool.query(
       `UPDATE users
        SET role = 'admin', status = 'active'
        WHERE email = $1`,
-      [adminEmail]
+      [DEFAULT_ADMIN_EMAIL]
     );
-    console.log(`Updated ${adminEmail} to admin role`);
+    console.log(`Updated ${DEFAULT_ADMIN_EMAIL} to admin role`);
   }
 };
 
@@ -361,6 +361,20 @@ app.patch('/users/:userId/status', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid user status.' });
     }
 
+    const existingUser = await pool.query(
+      'SELECT id, email FROM users WHERE id = $1',
+      [Number(userId)]
+    );
+
+    if (existingUser.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const normalizedEmail = (existingUser.rows[0].email || '').toLowerCase();
+    if (normalizedEmail === DEFAULT_ADMIN_EMAIL && status !== 'active') {
+      return res.status(400).json({ success: false, message: 'Cannot suspend the default administrator account.' });
+    }
+
     const result = await pool.query(
       `UPDATE users
        SET status = $1
@@ -368,10 +382,6 @@ app.patch('/users/:userId/status', async (req, res) => {
        RETURNING id, name, email, status, created_at`,
       [status, Number(userId)]
     );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'User not found.' });
-    }
 
     const user = result.rows[0];
 
@@ -388,6 +398,61 @@ app.patch('/users/:userId/status', async (req, res) => {
   } catch (error) {
     console.error('Error updating user status', error);
     res.status(500).json({ success: false, message: 'Unable to update user status.' });
+  }
+});
+
+// UPDATE USER ROLE
+app.patch('/users/:userId/role', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    const normalizedRole = typeof role === 'string' ? role.toLowerCase() : '';
+
+    if (!ALLOWED_ROLES.includes(normalizedRole)) {
+      return res.status(400).json({ success: false, message: 'Invalid user role.' });
+    }
+
+    const existingResult = await pool.query(
+      'SELECT id, name, email, status, role, created_at FROM users WHERE id = $1',
+      [Number(userId)]
+    );
+
+    if (existingResult.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const existingUser = existingResult.rows[0];
+    const normalizedEmail = (existingUser.email || '').toLowerCase();
+
+    if (normalizedEmail === DEFAULT_ADMIN_EMAIL && normalizedRole !== 'admin') {
+      return res.status(400).json({ success: false, message: 'Cannot remove admin role from the default administrator account.' });
+    }
+
+    const updateResult = await pool.query(
+      `UPDATE users
+       SET role = $1
+       WHERE id = $2
+       RETURNING id, name, email, status, role, created_at`,
+      [normalizedRole, Number(userId)]
+    );
+
+    const user = updateResult.rows[0];
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+        role: user.role || 'customer',
+        createdAt: user.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating user role', error);
+    res.status(500).json({ success: false, message: 'Unable to update user role.' });
   }
 });
 
