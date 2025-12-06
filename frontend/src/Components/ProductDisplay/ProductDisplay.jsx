@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import './ProductDisplay.css'
 import star_icon from '../assests/star_icon.png'
 import star_dull_icon from '../assests/star_dull_icon.png'
@@ -9,7 +9,34 @@ import { useNavigate } from 'react-router-dom'
 const ProductDisplay = (props) => {
   const { product } = props
   const { addToCart } = useContext(ShopContext)
-  const productImage = resolveImageUrl(product?.image)
+  const resolvedImages = useMemo(() => {
+    let imageList = []
+
+    if (Array.isArray(product?.images)) {
+      imageList = product.images
+    } else if (typeof product?.images === 'string') {
+      try {
+        const parsed = JSON.parse(product.images)
+        if (Array.isArray(parsed)) {
+          imageList = parsed
+        }
+      } catch (error) {
+        // ignore parse errors and rely on the primary image
+      }
+    }
+
+    const normalized = imageList
+      .map((img) => resolveImageUrl(img))
+      .filter(Boolean)
+
+    const primary = resolveImageUrl(product?.image)
+    if (primary && !normalized.includes(primary)) {
+      normalized.unshift(primary)
+    }
+
+    return normalized.length ? normalized : primary ? [primary] : []
+  }, [product])
+  const [activeImage, setActiveImage] = useState(resolvedImages[0] || '')
   const [selectedSize, setSelectedSize] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
@@ -17,6 +44,10 @@ const ProductDisplay = (props) => {
   const navigate = useNavigate()
 
   const sizeOptions = useMemo(() => ['S', 'M', 'L', 'XL', 'XXL'], [])
+
+  useEffect(() => {
+    setActiveImage(resolvedImages[0] || '')
+  }, [resolvedImages])
 
   if (!product) {
     return null
@@ -54,17 +85,29 @@ const ProductDisplay = (props) => {
     navigate('/')
   }
 
+  const productImage = activeImage || resolvedImages[0] || resolveImageUrl(product?.image)
+
   return (
     <div className='productdisplay'>
       <div className='productdisplay-left'>
         <div className='productdisplay-img-list'>
-          <img src={productImage} alt='' />
-          <img src={productImage} alt='' />
-          <img src={productImage} alt='' />
-          <img src={productImage} alt='' />
+          {resolvedImages.map((img) => (
+            <button
+              key={img}
+              type='button'
+              className={
+                img === activeImage
+                  ? 'productdisplay-thumbnail active'
+                  : 'productdisplay-thumbnail'
+              }
+              onClick={() => setActiveImage(img)}
+            >
+              <img src={img} alt='Hình sản phẩm' />
+            </button>
+          ))}
         </div>
         <div className='prodcutdisplay-img'>
-          <img className='prodcutdisplay-main-img' src={productImage} alt='' />
+          <img className='prodcutdisplay-main-img' src={activeImage} alt='' />
         </div>
       </div>
       <div className='productdisplay-right'>

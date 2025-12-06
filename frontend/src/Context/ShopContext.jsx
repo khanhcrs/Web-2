@@ -35,10 +35,39 @@ const ShopContextProvider = (props) => {
       const data = await response.json();
 
       if (Array.isArray(data) && data.length > 0) {
-        const normalizedProducts = data.map((product) => ({
-          ...product,
-          image: resolveImageUrl(product.image),
-        }));
+        const normalizedProducts = data.map((product) => {
+          let rawImages = []
+
+          if (Array.isArray(product.images)) {
+            rawImages = product.images
+          } else if (typeof product.images === 'string') {
+            try {
+              const parsed = JSON.parse(product.images)
+              if (Array.isArray(parsed)) {
+                rawImages = parsed
+              }
+            } catch (error) {
+              // ignore parse errors and fall back to primary image
+            }
+          }
+
+          const normalizedImages = rawImages
+            .map((img) => resolveImageUrl(img))
+            .filter(Boolean)
+
+          const primaryImage = resolveImageUrl(product.image)
+          const images = normalizedImages.length
+            ? normalizedImages
+            : primaryImage
+              ? [primaryImage]
+              : []
+
+          return {
+            ...product,
+            images,
+            image: images[0] || primaryImage || '',
+          }
+        })
         setProducts(normalizedProducts);
         setError('');
       } else {
