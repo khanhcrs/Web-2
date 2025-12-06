@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import './CSS/ShopCategory.css'
 import { ShopContext } from '../Context/ShopContext'
 import Item from '../Components/Item/Item'
@@ -7,6 +7,8 @@ const ShopCategory = (props) => {
   const { products, loadingProducts, searchTerm } = useContext(ShopContext)
   const [sortType, setSortType] = useState('default') // default | price-asc | price-desc
   const [priceRange, setPriceRange] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const productsPerPage = 10
 
   const priceFilters = [
     { value: 'all', label: 'Tất cả' },
@@ -62,7 +64,30 @@ const ShopCategory = (props) => {
     }
 
     return list
-  }, [products, props.category, searchTerm, sortType])
+  }, [products, props.category, searchTerm, sortType, priceRange])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [props.category, searchTerm, sortType, priceRange])
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / productsPerPage))
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [totalPages, currentPage])
+
+  const startIndex = (currentPage - 1) * productsPerPage
+  const displayedProducts = filteredProducts.slice(
+    startIndex,
+    startIndex + productsPerPage
+  )
+
+  const goToPage = (page) => {
+    const nextPage = Math.min(Math.max(page, 1), totalPages)
+    setCurrentPage(nextPage)
+  }
 
   return (
     <div className='shop-category'>
@@ -167,7 +192,7 @@ const ShopCategory = (props) => {
             )}
 
             {!loadingProducts &&
-              filteredProducts.map((item) => (
+              displayedProducts.map((item) => (
                 <Item
                   key={item.id}
                   id={item.id}
@@ -187,7 +212,40 @@ const ShopCategory = (props) => {
         </div>
       </div>
 
-      <div className='shopcategory-loadmore'>Xem thêm</div>
+      <div className='shopcategory-pagination'>
+        <button
+          className='pagination-button'
+          onClick={() => goToPage(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          Trước
+        </button>
+
+        <div className='pagination-pages'>
+          {Array.from({ length: totalPages }, (_, index) => {
+            const pageNumber = index + 1
+            return (
+              <button
+                key={pageNumber}
+                className={`pagination-page ${
+                  currentPage === pageNumber ? 'active' : ''
+                }`}
+                onClick={() => goToPage(pageNumber)}
+              >
+                {pageNumber}
+              </button>
+            )
+          })}
+        </div>
+
+        <button
+          className='pagination-button'
+          onClick={() => goToPage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          Sau
+        </button>
+      </div>
     </div>
   )
 }
