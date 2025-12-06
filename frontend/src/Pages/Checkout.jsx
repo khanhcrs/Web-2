@@ -35,6 +35,7 @@ const formatCurrency = (value) => {
 
 const Checkout = () => {
   const { cartItems, products, clearCart } = useContext(ShopContext)
+  const { user } = useContext(AuthContext)
   const [formData, setFormData] = useState(initialFormState)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
