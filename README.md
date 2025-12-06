@@ -6,6 +6,13 @@ This repository contains three separate apps that work together:
 - `admin/` – React (Vite) admin dashboard.
 - `frontend/` – React storefront built with Create React App.
 
+The backend now seeds a default admin account for convenience:
+
+- Email: `admin@clothify.com`
+- Password: `Admin@123`
+
+After logging in with this account on the storefront, you will be redirected to the admin dashboard (running at `http://localhost:5173` by default). If you change the admin dev server port, update the storefront `REACT_APP_ADMIN_PORTAL_URL` accordingly.
+
 Follow the steps below if you just pulled the project and want to run everything locally without copying files around manually.
 
 ## 1. Clone or update the repository

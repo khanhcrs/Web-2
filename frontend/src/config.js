@@ -11,6 +11,12 @@ export const API_BASE_URL = normalizeBaseUrl(
   process.env.REACT_APP_API_BASE_URL || DEFAULT_API_BASE_URL
 )
 
+const DEFAULT_ADMIN_PORTAL_URL = 'http://localhost:5173'
+
+export const ADMIN_PORTAL_URL = normalizeBaseUrl(
+  process.env.REACT_APP_ADMIN_PORTAL_URL || DEFAULT_ADMIN_PORTAL_URL
+)
+
 const isAbsoluteUrl = (url) => /^https?:\/\//i.test(url)
 
 export const resolveImageUrl = (imagePath) => {
