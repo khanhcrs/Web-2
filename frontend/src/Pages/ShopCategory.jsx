@@ -62,7 +62,7 @@ const ShopCategory = (props) => {
     }
 
     return list
-  }, [products, props.category, searchTerm, sortType])
+  }, [products, props.category, searchTerm, sortType, priceRange])
 
   return (
     <div className='shop-category'>
