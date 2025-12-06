@@ -73,7 +73,7 @@
 .customer-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 640px;
+    min-width: 760px;
 }
 
 .customer-table th,
@@ -142,6 +142,36 @@
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+}
+
+.customer-role-select {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #111827;
+    font-weight: 600;
+    cursor: pointer;
+    min-width: 160px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.customer-role-select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.customer-role-select:disabled {
+    background: #f3f4f6;
+    cursor: not-allowed;
+    color: #6b7280;
+}
+
+.customer-note {
+    margin: 6px 0 0;
+    color: #6b7280;
+    font-size: 13px;
 }
 
 @media (max-width: 900px) {
