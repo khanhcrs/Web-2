@@ -155,22 +155,24 @@ async function migrateUsers() {
         const name = u.name || '';
         const password = u.password || ''; // đã hash sẵn trong Mongo
         const status = u.status || 'active';
+        const role = 'customer';
         const created =
             u.createdAt || u.date || new Date(); // lấy createdAt, nếu không có thì lấy date
 
         const cartData = u.cartData || {};
 
         const result = await pgPool.query(
-            `INSERT INTO users (name, email, password, status, cart_data, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+            `INSERT INTO users (name, email, password, status, role, cart_data, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT (email) DO UPDATE SET
          name = EXCLUDED.name,
          password = EXCLUDED.password,
          status = EXCLUDED.status,
+         role = EXCLUDED.role,
          cart_data = EXCLUDED.cart_data,
          updated_at = CURRENT_TIMESTAMP
        RETURNING id`,
-            [name, email, password, status, cartData, created, created]
+            [name, email, password, status, role, cartData, created, created]
         );
 
         const pgId = result.rows[0].id;
