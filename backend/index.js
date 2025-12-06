@@ -22,8 +22,51 @@ const pool = new Pool({
   port: 5432,
 });
 
+const ensureSchemaAndAdminUser = async () => {
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role VARCHAR(50)
+      DEFAULT 'customer'
+      CHECK (role IN ('customer', 'admin'))
+  `);
+
+  await pool.query("UPDATE users SET role = 'customer' WHERE role IS NULL");
+
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@clothify.com').toLowerCase();
+  const adminName = process.env.ADMIN_NAME || 'Clothify Admin';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
+
+  const adminResult = await pool.query('SELECT id, role FROM users WHERE email = $1', [adminEmail]);
+
+  if (adminResult.rowCount === 0) {
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    await pool.query(
+      `INSERT INTO users (name, email, password, status, role)
+       VALUES ($1, $2, $3, 'active', 'admin')`,
+      [adminName, adminEmail, hashedPassword]
+    );
+    console.log(`Seeded default admin account for ${adminEmail}`);
+  } else if (adminResult.rows[0].role !== 'admin') {
+    await pool.query(
+      `UPDATE users
+       SET role = 'admin', status = 'active'
+       WHERE email = $1`,
+      [adminEmail]
+    );
+    console.log(`Updated ${adminEmail} to admin role`);
+  }
+};
+
 pool.connect()
-  .then(() => console.log('Connected to PostgreSQL'))
+  .then(async (client) => {
+    client.release();
+    console.log('Connected to PostgreSQL');
+    try {
+      await ensureSchemaAndAdminUser();
+    } catch (error) {
+      console.error('Failed to initialize database schema', error);
+    }
+  })
   .catch(err => console.error('PostgreSQL connection error', err.stack));
 
 // ================== API TEST ==================
@@ -207,9 +250,9 @@ app.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `INSERT INTO users (name, email, password)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, email, status, created_at`,
+      `INSERT INTO users (name, email, password, role)
+       VALUES ($1, $2, $3, 'customer')
+       RETURNING id, name, email, status, role, created_at`,
       [name, email, hashedPassword]
     );
 
@@ -225,6 +268,7 @@ app.post('/register', async (req, res) => {
         name: user.name,
         email: user.email,
         status: user.status,
+        role: user.role || 'customer',
         createdAt: user.created_at,
       },
     });
@@ -274,6 +318,7 @@ app.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         status: user.status,
+        role: user.role || 'customer',
         createdAt: user.created_at,
       },
     });
@@ -287,7 +332,7 @@ app.post('/login', async (req, res) => {
 app.get('/users', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, status, created_at FROM users ORDER BY created_at DESC'
+      'SELECT id, name, email, status, role, created_at FROM users ORDER BY created_at DESC'
     );
 
     const users = result.rows.map(u => ({
@@ -295,6 +340,7 @@ app.get('/users', async (req, res) => {
       name: u.name,
       email: u.email,
       status: u.status,
+      role: u.role || 'customer',
       createdAt: u.created_at,
     }));
 

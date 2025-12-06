@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react'
 import './CSS/LoginSignup.css'
-import { API_BASE_URL } from '../config'
+import { ADMIN_PORTAL_URL, API_BASE_URL } from '../config'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../Context/AuthContext'
 
@@ -59,7 +59,11 @@ const LoginSignup = () => {
         setMode('login')
       } else if (data.token && data.user) {
         authenticate(data.token, data.user)
-        navigate('/', { replace: true })
+        if (data.user.role === 'admin') {
+          window.location.href = ADMIN_PORTAL_URL || '/admin'
+        } else {
+          navigate('/', { replace: true })
+        }
       }
     } catch (err) {
       setError(err.message)
