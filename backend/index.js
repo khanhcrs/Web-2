@@ -19,10 +19,10 @@ app.use(cors());
 
 // ================== PostgreSQL CONNECTION ==================
 const pool = new Pool({
-  user: 'postgres',        // đổi nếu bạn dùng user khác
-  host: 'localhost',
-  database: 'clothify',    // đúng với tên DB bạn tạo
-  password: '123123',      // đổi thành password postgres của bạn
+  user: 'postgres',
+  host: 'localhost',      // hoặc '127.0.0.1'
+  database: 'clothify',   // đúng TÊN DB bạn tạo
+  password: 'kt123456',   // ***GIỐNG HỆT*** mật khẩu ở bước 1
   port: 5432,
 });
 
@@ -583,15 +583,15 @@ const formatOrderResponse = (order, items = []) => ({
   createdAt: order.created_at,
   customer: order.customer_id
     ? {
-        id: order.customer_id,
-        name: order.user_name || order.customer_name,
-        email: order.user_email || order.customer_email,
-        status: order.user_status || 'active',
-      }
+      id: order.customer_id,
+      name: order.user_name || order.customer_name,
+      email: order.user_email || order.customer_email,
+      status: order.user_status || 'active',
+    }
     : {
-        name: order.customer_name,
-        email: order.customer_email,
-      },
+      name: order.customer_name,
+      email: order.customer_email,
+    },
   items: items.map(item => ({
     productId: item.product_id,
     name: item.name,
@@ -676,11 +676,11 @@ app.post('/orders', async (req, res) => {
 
     const sanitizedItems = Array.isArray(items)
       ? items.map((item) => ({
-          product_id: item.productId,
-          name: item.name,
-          quantity: Number(item.quantity) || 0,
-          price: Number(item.price) || 0,
-        }))
+        product_id: item.productId,
+        name: item.name,
+        quantity: Number(item.quantity) || 0,
+        price: Number(item.price) || 0,
+      }))
       : [];
 
     const parsedTotal = Number(total) || 0;
