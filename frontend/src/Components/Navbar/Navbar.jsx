@@ -4,8 +4,8 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import logo from '../assests/logo.png'
 import cart_icon from '../assests/cart_icon.png'
-import { ShopContext } from '../../Context/ShopContext'
 import nav_dropdown from '../assests/nav_dropdown.png'
+import { ShopContext } from '../../Context/ShopContext'
 import { AuthContext } from '../../Context/AuthContext'
 
 const Navbar = () => {
@@ -29,9 +29,7 @@ const Navbar = () => {
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
-
         const keyword = searchTerm.trim()
-
         if (keyword) {
             navigate(`/search?query=${encodeURIComponent(keyword)}`)
             setShowSuggestions(false)
@@ -39,15 +37,13 @@ const Navbar = () => {
             navigate('/')
         }
     }
+
+    // Logic gợi ý tìm kiếm
     const filteredSuggestions = useMemo(() => {
         const keyword = searchTerm.trim().toLowerCase()
-
         if (!keyword) return []
-
         return products
-            .filter((product) =>
-                String(product.name || '').toLowerCase().includes(keyword)
-            )
+            .filter((product) => String(product.name || '').toLowerCase().includes(keyword))
             .slice(0, 6)
     }, [products, searchTerm])
 
@@ -57,34 +53,35 @@ const Navbar = () => {
         navigate(`/product/${product.id}`)
     }
 
+    // Đóng gợi ý khi click ra ngoài
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
                 setShowSuggestions(false)
             }
         }
-
         document.addEventListener('mousedown', handleClickOutside)
-
         return () => {
             document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [])
 
-
     return (
         <div className='navbar'>
-            <Link to='/' className="navbar-logo">
-                <img src={logo} alt='' />
+            <Link to='/' className="navbar-logo" onClick={() => setMenu("Cửa hàng")}>
+                <img src={logo} alt='Shopper Logo' />
                 <p>SHOPPER</p>
             </Link>
-            <img className='nav-dropdown' onClick={dropdown_toggle} src={nav_dropdown} alt="" />
+
+            <img className='nav-dropdown' onClick={dropdown_toggle} src={nav_dropdown} alt="Menu" />
+
             <ul ref={menuRef} className="nav-menu">
-                <li onClick={() => { setMenu("Cửa hàng") }}><Link to='/' style={{ textDecoration: 'none' }} >Cửa hàng</Link>{menu === "Cửa hàng" ? <hr /> : <></>}</li>
-                <li onClick={() => { setMenu("Đàn ông") }}><Link to='/mens' style={{ textDecoration: 'none' }} >Đàn ông</Link>{menu === "Đàn ông" ? <hr /> : <></>}</li>
-                <li onClick={() => { setMenu("Phụ nữ") }}><Link to='/womens' style={{ textDecoration: 'none' }} >Phụ nữ</Link>{menu === "Phụ nữ" ? <hr /> : <></>}</li>
-                <li onClick={() => { setMenu("Trẻ em") }}><Link to='/kids' style={{ textDecoration: 'none' }} >Trẻ em</Link>{menu === "Trẻ em" ? <hr /> : <></>}</li>
+                <li onClick={() => setMenu("Cửa hàng")}><Link to='/'>Cửa hàng</Link>{menu === "Cửa hàng" ? <hr /> : <></>}</li>
+                <li onClick={() => setMenu("Đàn ông")}><Link to='/mens'>Đàn ông</Link>{menu === "Đàn ông" ? <hr /> : <></>}</li>
+                <li onClick={() => setMenu("Phụ nữ")}><Link to='/womens'>Phụ nữ</Link>{menu === "Phụ nữ" ? <hr /> : <></>}</li>
+                <li onClick={() => setMenu("Trẻ em")}><Link to='/kids'>Trẻ em</Link>{menu === "Trẻ em" ? <hr /> : <></>}</li>
             </ul>
+
             <div className="nav-actions">
                 <div className='nav-search-wrapper' ref={suggestionRef}>
                     <form className='nav-search' onSubmit={handleSearchSubmit}>
@@ -128,13 +125,15 @@ const Navbar = () => {
                 <div className="nav-login-cart">
                     {user ? (
                         <>
-                            <span className='nav-user-name'>Xin chào, {user.name}</span>
+                            <span className='nav-user-name'>Chào, {user.name}</span>
                             <button onClick={handleLogout}>Đăng xuất</button>
                         </>
                     ) : (
                         <Link to='/login'><button>Đăng nhập</button></Link>
                     )}
-                    <Link to='/cart'><img src={cart_icon} alt='' /></Link>
+                    <Link to='/cart'>
+                        <img src={cart_icon} alt='Cart' />
+                    </Link>
                     <div className="nav-cart-count">{getTotalCartItems()}</div>
                 </div>
             </div>
