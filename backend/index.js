@@ -21,8 +21,8 @@ app.use(cors());
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',      // hoặc '127.0.0.1'
-  database: 'clothify',
-  password: 'kt123456',   // ← giống hệt bước 1 và 2
+  database: 'clothify',   // đúng TÊN DB bạn tạo
+  password: 'kt123456',   // ***GIỐNG HỆT*** mật khẩu ở bước 1
   port: 5432,
 });
 

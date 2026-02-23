@@ -8,11 +8,8 @@ const SearchResults = () => {
   const { products, loadingProducts, searchTerm, setSearchTerm } = useContext(ShopContext)
   const location = useLocation()
 
-  // State cho bộ lọc và sắp xếp
   const [sortType, setSortType] = useState('default')
   const [priceRange, setPriceRange] = useState('all')
-
-  // State cho phân trang
   const [currentPage, setCurrentPage] = useState(1)
   const productsPerPage = 10
 
@@ -24,55 +21,48 @@ const SearchResults = () => {
     { value: '600-plus', label: 'Trên 600.000đ' },
   ]
 
-  // --- SỬA LỖI TẠI ĐÂY ---
-  // Chỉ cập nhật searchTerm khi URL thực sự thay đổi (lúc bấm Enter hoặc click gợi ý)
-  // Bỏ 'searchTerm' ra khỏi mảng phụ thuộc để tránh loop khi đang gõ
+  // ============ PHẦN SỬA LỖI Ở ĐÂY ============
   useEffect(() => {
     const params = new URLSearchParams(location.search)
-    const query = params.get('query') || ''
+    const query = params.get('query')
 
-    // Chỉ set nếu khác nhau để tránh render thừa
-    setSearchTerm((prev) => {
-      if (prev !== query) return query;
-      return prev;
-    })
+    // Chỉ cập nhật nếu trên URL thực sự có query và nó KHÁC với cái hiện tại
+    // Quan trọng: Bỏ dependency [searchTerm] đi để tránh vòng lặp vô tận khi gõ
+    if (query !== null && query !== searchTerm) {
+      setSearchTerm(query)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, setSearchTerm])
-  // ------------------------
+  // ============================================
 
-  // Danh sách sản phẩm đã lọc + sắp xếp
+  // Reset về trang 1 khi thay đổi bộ lọc
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [sortType, priceRange, searchTerm]) // searchTerm thay đổi (khi bấm tìm kiếm) thì reset trang
+
   const filteredProducts = useMemo(() => {
     let list = Array.isArray(products) ? [...products] : []
 
-    // Lấy từ khoá từ URL param thay vì searchTerm đang gõ dở
-    // Điều này giúp kết quả hiển thị đúng với URL, còn thanh search thì vẫn cho phép user gõ tiếp
-    const params = new URLSearchParams(location.search)
-    const urlKeyword = (params.get('query') || '').trim().toLowerCase()
+    // Lấy keyword từ searchTerm (state) để lọc realtime
+    // Hoặc nếu bạn muốn chặt chẽ hơn: Lấy từ URL params
+    const keyword = searchTerm.trim().toLowerCase()
 
-    if (!urlKeyword) {
-      return []
-    }
+    if (!keyword) return []
 
     // Lọc theo từ khóa
     list = list.filter((p) => String(p.name || '').toLowerCase().includes(urlKeyword))
 
-    // Lọc theo khoảng giá
     list = list.filter((p) => {
       const price = Number(p.new_price || 0)
       switch (priceRange) {
-        case 'under-200':
-          return price < 200000
-        case '200-400':
-          return price >= 200000 && price < 400000
-        case '400-600':
-          return price >= 400000 && price < 600000
-        case '600-plus':
-          return price >= 600000
-        default:
-          return true
+        case 'under-200': return price < 200000
+        case '200-400': return price >= 200000 && price < 400000
+        case '400-600': return price >= 400000 && price < 600000
+        case '600-plus': return price >= 600000
+        default: return true
       }
     })
 
-    // Sắp xếp
     if (sortType === 'price-asc') {
       list.sort((a, b) => Number(a.new_price || 0) - Number(b.new_price || 0))
     } else if (sortType === 'price-desc') {
@@ -80,34 +70,18 @@ const SearchResults = () => {
     }
 
     return list
-  }, [products, location.search, sortType, priceRange]) // Dùng location.search thay vì searchTerm
+  }, [products, searchTerm, sortType, priceRange])
 
-  // Reset về trang 1 khi URL hoặc filter đổi
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [location.search, sortType, priceRange])
-
+  // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / productsPerPage))
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [totalPages, currentPage])
-
   const startIndex = (currentPage - 1) * productsPerPage
-  const displayedProducts = filteredProducts.slice(
-    startIndex,
-    startIndex + productsPerPage
-  )
+  const displayedProducts = filteredProducts.slice(startIndex, startIndex + productsPerPage)
 
   const goToPage = (page) => {
     const nextPage = Math.min(Math.max(page, 1), totalPages)
     setCurrentPage(nextPage)
+    window.scrollTo(0, 0)
   }
-
-  // Lấy keyword để hiển thị UI
-  const displayKeyword = new URLSearchParams(location.search).get('query') || ''
 
   return (
     <div className='shop-category'>
@@ -130,108 +104,58 @@ const SearchResults = () => {
               ))}
             </div>
           </div>
-
-          <div className='sidebar-section'>
-            <h3>Sắp xếp giá</h3>
-            <div className='sidebar-options'>
-              <label className='sidebar-option'>
-                <input
-                  type='radio'
-                  name='price-sort'
-                  value='default'
-                  checked={sortType === 'default'}
-                  onChange={(e) => setSortType(e.target.value)}
-                />
-                <span>Mặc định</span>
-              </label>
-              <label className='sidebar-option'>
-                <input
-                  type='radio'
-                  name='price-sort'
-                  value='price-asc'
-                  checked={sortType === 'price-asc'}
-                  onChange={(e) => setSortType(e.target.value)}
-                />
-                <span>Giá tăng dần</span>
-              </label>
-              <label className='sidebar-option'>
-                <input
-                  type='radio'
-                  name='price-sort'
-                  value='price-desc'
-                  checked={sortType === 'price-desc'}
-                  onChange={(e) => setSortType(e.target.value)}
-                />
-                <span>Giá giảm dần</span>
-              </label>
-            </div>
-          </div>
           <div className='sidebar-summary'>
-            <p><strong>{filteredProducts.length}</strong> sản phẩm phù hợp</p>
+            <p><strong>{filteredProducts.length}</strong> kết quả</p>
           </div>
         </aside>
 
         <div className='shopcategory-main'>
           <div className='shopcategory-indexSort'>
             <p>
-              {displayKeyword ? (
-                <>
-                  <span>Hiển thị {displayedProducts.length}/{filteredProducts.length}</span> kết quả cho
-                  <strong> "{displayKeyword}"</strong>
-                </>
+              {searchTerm.trim() ? (
+                <>Kết quả tìm kiếm cho <strong>"{searchTerm}"</strong></>
               ) : (
-                <span>Nhập từ khóa tìm kiếm...</span>
+                <span>Nhập từ khóa để tìm kiếm...</span>
               )}
             </p>
-
             <div className='shopcategory-controls'>
-              <div className='shopcategory-sort'>
-                <span className='shopcategory-sort-label'>Sắp xếp:</span>
-                <select
-                  className='sort-dropdown'
-                  value={sortType}
-                  onChange={(e) => setSortType(e.target.value)}
-                >
-                  <option value='default'>Mặc định</option>
-                  <option value='price-asc'>Giá tăng dần</option>
-                  <option value='price-desc'>Giá giảm dần</option>
-                </select>
-              </div>
+              <select className='sort-dropdown' value={sortType} onChange={(e) => setSortType(e.target.value)}>
+                <option value='default'>Mặc định</option>
+                <option value='price-asc'>Giá tăng dần</option>
+                <option value='price-desc'>Giá giảm dần</option>
+              </select>
             </div>
           </div>
 
           <div className='shopcategory-products'>
-            {loadingProducts && <p className='shopcategory-empty'>Đang tải...</p>}
-
+            {loadingProducts && <p>Đang tải...</p>}
             {!loadingProducts && displayedProducts.map((item) => (
-              <Item
-                key={item.id}
-                id={item.id}
-                name={item.name}
-                image={item.image}
-                new_price={item.new_price}
-                old_price={item.old_price}
-              />
+              <Item key={item.id} {...item} />
             ))}
-
-            {!loadingProducts && displayKeyword && filteredProducts.length === 0 && (
-              <p className='shopcategory-empty'>Không tìm thấy sản phẩm nào.</p>
+            {!loadingProducts && filteredProducts.length === 0 && (
+              <p>Không tìm thấy sản phẩm nào.</p>
             )}
           </div>
+
+          {filteredProducts.length > 0 && (
+            <div className='shopcategory-pagination'>
+              <button disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>Trước</button>
+              <div className='pagination-pages'>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i + 1}
+                    className={currentPage === i + 1 ? 'active' : ''}
+                    onClick={() => goToPage(i + 1)}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <button disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)}>Sau</button>
+            </div>
+          )}
         </div>
       </div>
-
-      {filteredProducts.length > 0 && (
-        <div className='shopcategory-pagination'>
-          <button className='pagination-button' onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>Trước</button>
-          <div className='pagination-pages'>
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button key={i + 1} className={`pagination-page ${currentPage === i + 1 ? 'active' : ''}`} onClick={() => goToPage(i + 1)}>{i + 1}</button>
-            ))}
-          </div>
-          <button className='pagination-button' onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}>Sau</button>
-        </div>
-      )}
     </div>
   )
 }
