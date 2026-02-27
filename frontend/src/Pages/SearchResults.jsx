@@ -50,7 +50,7 @@ const SearchResults = () => {
     if (!keyword) return []
 
     // Lọc theo từ khóa
-    list = list.filter((p) => String(p.name || '').toLowerCase().includes(urlKeyword))
+    list = list.filter((p) => String(p.name || '').toLowerCase().includes(keyword))
 
     list = list.filter((p) => {
       const price = Number(p.new_price || 0)

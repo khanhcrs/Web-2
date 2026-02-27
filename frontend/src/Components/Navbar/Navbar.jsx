@@ -125,7 +125,7 @@ const Navbar = () => {
                 <div className="nav-login-cart">
                     {user ? (
                         <>
-                            <Link to='/account' className='nav-user-name'>Chào, {user.name}</Link>
+                            <Link to='/account' className='nav-user-name'>{user.name}</Link>
                             <button onClick={handleLogout}>Đăng xuất</button>
                         </>
                     ) : (
