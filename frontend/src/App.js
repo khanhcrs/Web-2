@@ -13,6 +13,7 @@ import women_banner from './Components/assests/banner_women.png';
 import kid_banner from './Components/assests/banner_kids.png';
 import Checkout from './Pages/Checkout'
 import SearchResults from './Pages/SearchResults'
+import AccountProfile from './Pages/AccountProfile'
 
 const AppRoutes = () => {
   const location = useLocation()
@@ -32,6 +33,7 @@ const AppRoutes = () => {
         </Route>
         <Route path='/cart' element={<Cart />} />
         <Route path='/checkout' element={<Checkout />} />
+        <Route path='/account' element={<AccountProfile />} />
         <Route path='/login' element={<LoginSignup />} />
       </Routes>
       {!hideLayout && <Footer />}

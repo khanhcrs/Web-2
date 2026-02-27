@@ -1,0 +1,242 @@
+.account-profile-page {
+  min-height: 70vh;
+  background: #f5f5f5;
+  padding: 36px 0 60px;
+}
+
+.account-profile-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 48px;
+  align-items: start;
+}
+
+.account-profile-main h1 {
+  margin: 0;
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.account-profile-greeting {
+  margin: 18px 0 42px;
+  font-size: 37px;
+  color: #222;
+}
+
+.account-profile-main h2 {
+  margin: 0 0 12px;
+  font-size: 36px;
+  font-weight: 700;
+  color: #313131;
+}
+
+.account-profile-order-box {
+  border-top: 1px solid #d7d7d7;
+}
+
+.account-profile-order-header {
+  margin-top: 18px;
+  background: #ededed;
+  border: 1px solid #d9d9d9;
+  border-bottom: 0;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.3fr 1.5fr 1.6fr;
+  gap: 18px;
+  padding: 18px 22px;
+  font-size: 33px;
+  font-weight: 600;
+  color: #2a2a2a;
+}
+
+.account-profile-empty-order {
+  margin: 0;
+  border: 1px solid #d9d9d9;
+  border-top: 0;
+  padding: 22px;
+  font-size: 34px;
+  color: #333;
+}
+
+.account-profile-sidebar {
+  padding-top: 20px;
+}
+
+.account-profile-side-title {
+  margin: 0 0 16px;
+  font-size: 33px;
+  color: #444;
+}
+
+.account-profile-side-name {
+  margin: 0 0 22px;
+  font-size: 32px;
+  color: #333;
+}
+
+.account-profile-btn {
+  display: inline-block;
+  background: #fff;
+  border: 1px solid #d2d2d2;
+  border-radius: 2px;
+  padding: 14px 22px;
+  font-size: 28px;
+  color: #333;
+  cursor: pointer;
+  margin-bottom: 18px;
+  text-decoration: none;
+}
+
+.account-profile-btn:hover {
+  border-color: #b7b7b7;
+}
+
+.account-profile-link-btn {
+  display: block;
+  width: fit-content;
+}
+
+.account-profile-logout {
+  display: block;
+}
+
+@media (max-width: 1280px) {
+  .account-profile-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .account-profile-main h1 {
+    font-size: 32px;
+  }
+
+  .account-profile-main h2,
+  .account-profile-greeting,
+  .account-profile-order-header,
+  .account-profile-empty-order,
+  .account-profile-side-title,
+  .account-profile-side-name,
+  .account-profile-btn {
+    font-size: 20px;
+  }
+}
+
+.account-address-book {
+  margin-top: 30px;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  padding: 22px;
+}
+
+.account-address-book-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.account-address-book-head h3 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.account-address-book-head p {
+  margin: 0;
+  font-size: 18px;
+  color: #666;
+}
+
+.account-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.account-address-form input {
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 17px;
+}
+
+.account-address-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.account-address-form-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-profile-btn-secondary {
+  background: #f3f3f3;
+}
+
+.account-profile-btn-danger {
+  background: #ffe9e9;
+  border-color: #efb6b6;
+}
+
+.account-address-list {
+  display: grid;
+  gap: 12px;
+}
+
+.account-address-empty {
+  margin: 0;
+  color: #666;
+}
+
+.account-address-item {
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fafafa;
+}
+
+.account-address-item p {
+  margin: 6px 0;
+  font-size: 16px;
+}
+
+.account-address-title {
+  margin-top: 0;
+  font-weight: 700;
+}
+
+.account-address-item-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 1280px) {
+  .account-address-book-head h3 {
+    font-size: 22px;
+  }
+
+  .account-address-book-head p,
+  .account-address-form input,
+  .account-address-item p {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .account-address-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .account-address-book-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
