@@ -1,14 +1,57 @@
-import React from 'react'
+import React, { useState } from 'react'
 import './DescriptionBox.css'
 
+const sizeChartRows = [
+    { label: '(1) DÀI ÁO', s: '61', m: '64', l: '67', xl: '70' },
+    { label: '(2) NGANG VAI', s: '53', m: '55.5', l: '58', xl: '60.5' },
+    { label: '(3) NGANG THÂN', s: '59', m: '62', l: '65', xl: '68' },
+    { label: '(4) DÀI TAY', s: '17', m: '18', l: '19', xl: '20' }
+]
+
 const DescriptionBox = () => {
-    return (
-        <div className='descriptionbox'>
-            <div className="descriptionbox-navigator">
-                <div className="descriptionbox-nav-box">Mô tả</div>
-                <div className="descriptionbox-nav-box fade">Đánh giá (122)</div>
-            </div>
-            <div className="descriptionbox-description">
+    const [activeTab, setActiveTab] = useState('description')
+
+    const renderContent = () => {
+        if (activeTab === 'size-chart') {
+            return (
+                <div className="descriptionbox-size-chart">
+                    <p><strong>Size chart:</strong></p>
+                    <p>Mẫu nữ cao 1m58 nặng 48kg mặc sản phẩm size S.</p>
+                    <p>Mẫu nữ cao 1m58 nặng 44kg mặc sản phẩm size S.</p>
+
+                    <table className="size-chart-table">
+                        <thead>
+                            <tr>
+                                <th>THÔNG SỐ (CM)</th>
+                                <th>SIZE S</th>
+                                <th>SIZE M</th>
+                                <th>SIZE L</th>
+                                <th>SIZE XL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sizeChartRows.map((row) => (
+                                <tr key={row.label}>
+                                    <td>{row.label}</td>
+                                    <td>{row.s}</td>
+                                    <td>{row.m}</td>
+                                    <td>{row.l}</td>
+                                    <td>{row.xl}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <p className="size-chart-note">*Thông số thực tế có thể chênh lệch 0.5 - 1cm</p>
+                </div>
+            )
+        }
+
+        if (activeTab === 'reviews') {
+            return <p>Đánh giá sản phẩm đang được cập nhật.</p>
+        }
+
+        return (
+            <>
                 <p>
                     Website thương mại điện tử là nền tảng trực tuyến giúp việc mua bán sản phẩm hoặc dịch vụ diễn ra qua internet.
                     Đây là chợ ảo nơi doanh nghiệp và cá nhân giới thiệu sản phẩm, tương tác với khách hàng và giao dịch mà không cần hiện diện vật lý.
@@ -17,8 +60,38 @@ const DescriptionBox = () => {
                 <p>
                     Thông thường, website thương mại điện tử hiển thị sản phẩm cùng mô tả chi tiết, hình ảnh, giá bán và các lựa chọn khác nhau như kích thước, màu sắc.
                     Mỗi sản phẩm đều có trang riêng với thông tin liên quan, đánh giá từ khách hàng và tuỳ chọn mua hàng để giúp người mua đưa ra quyết định chính xác.
-
                 </p>
+            </>
+        )
+    }
+
+    return (
+        <div className='descriptionbox'>
+            <div className="descriptionbox-navigator">
+                <button
+                    type="button"
+                    className={`descriptionbox-nav-box ${activeTab === 'description' ? 'active' : 'fade'}`}
+                    onClick={() => setActiveTab('description')}
+                >
+                    Mô tả
+                </button>
+                <button
+                    type="button"
+                    className={`descriptionbox-nav-box ${activeTab === 'size-chart' ? 'active' : 'fade'}`}
+                    onClick={() => setActiveTab('size-chart')}
+                >
+                    Size chart
+                </button>
+                <button
+                    type="button"
+                    className={`descriptionbox-nav-box ${activeTab === 'reviews' ? 'active' : 'fade'}`}
+                    onClick={() => setActiveTab('reviews')}
+                >
+                    Đánh giá (122)
+                </button>
+            </div>
+            <div className="descriptionbox-description">
+                {renderContent()}
             </div>
         </div>
     )

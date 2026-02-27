@@ -15,6 +15,13 @@
     width: 171px;
     height: 70px;
     border: 1px solid #d0d0d0;
+    background: #fff;
+    cursor: pointer;
+}
+
+.descriptionbox-nav-box.active {
+    background: #fff;
+    color: #171717;
 }
 
 .descriptionbox-nav-box.fade {
@@ -31,6 +38,45 @@
     padding-bottom: 70px;
 }
 
+.descriptionbox-size-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.size-chart-table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 680px;
+    margin-top: 6px;
+}
+
+.size-chart-table th,
+.size-chart-table td {
+    border: 1px solid #d0d0d0;
+    padding: 10px 12px;
+    text-align: center;
+}
+
+.size-chart-table th:first-child,
+.size-chart-table td:first-child {
+    text-align: left;
+}
+
+.size-chart-table thead th {
+    background-color: #8f8f8f;
+    color: #fff;
+}
+
+.size-chart-table tbody tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.size-chart-note {
+    font-style: italic;
+    color: #555;
+}
+
 @media(max-width:1280px) {
     .descriptionbox {
         margin: 60px;
@@ -39,11 +85,20 @@
 
 @media(max-width:800px) {
     .descriptionbox {
-        margin: 60px;
+        margin: 40px 20px;
     }
 
     .descriptionbox-description {
         font-size: 14px;
+        padding: 24px;
     }
 
+    .descriptionbox-nav-box {
+        width: 33.33%;
+        font-size: 14px;
+    }
+
+    .size-chart-table {
+        font-size: 13px;
+    }
 }
