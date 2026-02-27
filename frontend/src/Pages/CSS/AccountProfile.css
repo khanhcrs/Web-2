@@ -123,3 +123,74 @@
     font-size: 20px;
   }
 }
+
+.account-profile-address-book {
+  margin-bottom: 18px;
+}
+
+.account-profile-address-title {
+  margin: 0 0 10px;
+  font-size: 28px;
+  color: #333;
+}
+
+.account-profile-address-form textarea {
+  width: 100%;
+  border: 1px solid #d2d2d2;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 20px;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.account-profile-address-error {
+  margin: 0 0 10px;
+  color: #cc2020;
+  font-size: 18px;
+}
+
+.account-profile-address-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-profile-address-list li {
+  border: 1px solid #d7d7d7;
+  background: #fff;
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.account-profile-address-list span {
+  font-size: 18px;
+  color: #333;
+}
+
+.account-profile-address-remove {
+  border: 1px solid #ef5350;
+  background: #fff;
+  color: #ef5350;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 16px;
+}
+
+@media (max-width: 1280px) {
+  .account-profile-address-title {
+    font-size: 20px;
+  }
+
+  .account-profile-address-form textarea {
+    font-size: 16px;
+  }
+}

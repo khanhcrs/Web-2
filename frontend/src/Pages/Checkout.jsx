@@ -41,6 +41,12 @@ const Checkout = () => {
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
 
+  const addressBook = useMemo(
+    () => (Array.isArray(user?.addressBook) ? user.addressBook : []),
+    [user]
+  )
+
+
   useEffect(() => {
     if (!user) return
 
@@ -50,6 +56,15 @@ const Checkout = () => {
       email: user.email || ''
     }))
   }, [user])
+
+  useEffect(() => {
+    if (addressBook.length === 0) return
+
+    setFormData((prev) => ({
+      ...prev,
+      address: prev.address || addressBook[0],
+    }))
+  }, [addressBook])
 
   const items = useMemo(
     () =>
@@ -77,6 +92,7 @@ const Checkout = () => {
 
   const hasItems = items.length > 0
   const isEmailSynced = Boolean(user?.email)
+  const hasSavedAddresses = addressBook.length > 0
   const total = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items]
@@ -388,6 +404,28 @@ const Checkout = () => {
                 required
               />
             </div>
+
+            {hasSavedAddresses && (
+              <div className="checkout-form-group">
+                <label htmlFor="savedAddress">Chọn từ sổ địa chỉ</label>
+                <select
+                  id="savedAddress"
+                  value={formData.address}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      address: event.target.value,
+                    }))
+                  }
+                >
+                  {addressBook.map((address, index) => (
+                    <option key={`${address}-${index}`} value={address}>
+                      {address}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="checkout-form-group">
               <label htmlFor="address">Địa chỉ giao hàng</label>

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(50) DEFAULT 'customer' CHECK (role IN ('customer', 'admin')),
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     cart_data JSONB DEFAULT '{}',
+    address_book JSONB DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

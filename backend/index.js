@@ -37,6 +37,20 @@ const ensureSchemaAndAdminUser = async () => {
   await pool.query("UPDATE users SET role = 'customer' WHERE role IS NULL");
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS address_book JSONB DEFAULT '[]'::jsonb
+  `);
+
+  await pool.query(`
+    UPDATE users
+    SET address_book = CASE
+      WHEN address_book IS NULL THEN '[]'::jsonb
+      WHEN jsonb_typeof(address_book) != 'array' THEN '[]'::jsonb
+      ELSE address_book
+    END
+  `);
+
+  await pool.query(`
     ALTER TABLE products
     ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb
   `);
@@ -287,7 +301,7 @@ app.post('/register', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (name, email, password, role)
        VALUES ($1, $2, $3, 'customer')
-       RETURNING id, name, email, status, role, created_at`,
+       RETURNING id, name, email, status, role, address_book, created_at`,
       [name, email, hashedPassword]
     );
 
@@ -302,6 +316,7 @@ app.post('/register', async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        addressBook: Array.isArray(user.address_book) ? user.address_book : [],
         status: user.status,
         role: user.role || 'customer',
         createdAt: user.created_at,
@@ -352,6 +367,7 @@ app.post('/login', async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        addressBook: Array.isArray(user.address_book) ? user.address_book : [],
         status: user.status,
         role: user.role || 'customer',
         createdAt: user.created_at,
@@ -468,7 +484,7 @@ app.patch('/users/:userId/role', async (req, res) => {
       `UPDATE users
        SET role = $1
        WHERE id = $2
-       RETURNING id, name, email, status, role, created_at`,
+       RETURNING id, name, email, status, role, address_book, created_at`,
       [normalizedRole, Number(userId)]
     );
 
@@ -572,6 +588,76 @@ app.post('/removefromcart', fetchuser, async (req, res) => {
   } catch (error) {
     console.error('Error remove from cart', error);
     res.status(500).send({ error: "Server error" });
+  }
+});
+
+// ================== USER ADDRESS BOOK ==================
+app.get('/users/me/addresses', fetchuser, async (req, res) => {
+  try {
+    const userResult = await pool.query(
+      'SELECT id, address_book FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = userResult.rows[0];
+
+    res.json({
+      success: true,
+      addresses: Array.isArray(user.address_book) ? user.address_book : [],
+    });
+  } catch (error) {
+    console.error('Error fetching address book', error);
+    res.status(500).json({ success: false, message: 'Unable to fetch address book.' });
+  }
+});
+
+app.put('/users/me/addresses', fetchuser, async (req, res) => {
+  try {
+    const { addresses } = req.body;
+
+    if (!Array.isArray(addresses)) {
+      return res.status(400).json({ success: false, message: 'Addresses must be an array.' });
+    }
+
+    const normalizedAddresses = addresses
+      .map((address) => (typeof address === 'string' ? address.trim() : ''))
+      .filter((address) => address.length > 0)
+      .slice(0, 10);
+
+    const updateResult = await pool.query(
+      `UPDATE users
+       SET address_book = $1
+       WHERE id = $2
+       RETURNING id, name, email, status, role, address_book, created_at`,
+      [normalizedAddresses, req.user.id]
+    );
+
+    if (updateResult.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = updateResult.rows[0];
+
+    res.json({
+      success: true,
+      addresses: Array.isArray(user.address_book) ? user.address_book : [],
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        addressBook: Array.isArray(user.address_book) ? user.address_book : [],
+        status: user.status,
+        role: user.role || 'customer',
+        createdAt: user.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating address book', error);
+    res.status(500).json({ success: false, message: 'Unable to update address book.' });
   }
 });
 
