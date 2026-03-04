@@ -38,7 +38,6 @@ const Navbar = () => {
         }
     }
 
-    // Logic gợi ý tìm kiếm
     const filteredSuggestions = useMemo(() => {
         const keyword = searchTerm.trim().toLowerCase()
         if (!keyword) return []
@@ -53,7 +52,6 @@ const Navbar = () => {
         navigate(`/product/${product.id}`)
     }
 
-    // Đóng gợi ý khi click ra ngoài
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
@@ -68,18 +66,32 @@ const Navbar = () => {
 
     return (
         <div className='navbar'>
-            <Link to='/' className="navbar-logo" onClick={() => setMenu("Cửa hàng")}>
+            {/* Logo luôn không có gạch chân */}
+            <Link to='/' className="navbar-logo" style={{ textDecoration: 'none' }} onClick={() => setMenu("Cửa hàng")}>
                 <img src={logo} alt='Shopper Logo' />
                 <p>SHOPPER</p>
             </Link>
 
+            {/* Nút dropdown này chỉ hiện trên mobile (<800px) */}
             <img className='nav-dropdown' onClick={dropdown_toggle} src={nav_dropdown} alt="Menu" />
 
             <ul ref={menuRef} className="nav-menu">
-                <li onClick={() => setMenu("Cửa hàng")}><Link to='/'>Cửa hàng</Link>{menu === "Cửa hàng" ? <hr /> : <></>}</li>
-                <li onClick={() => setMenu("Đàn ông")}><Link to='/mens'>Đàn ông</Link>{menu === "Đàn ông" ? <hr /> : <></>}</li>
-                <li onClick={() => setMenu("Phụ nữ")}><Link to='/womens'>Phụ nữ</Link>{menu === "Phụ nữ" ? <hr /> : <></>}</li>
-                <li onClick={() => setMenu("Trẻ em")}><Link to='/kids'>Trẻ em</Link>{menu === "Trẻ em" ? <hr /> : <></>}</li>
+                <li onClick={() => setMenu("Cửa hàng")}>
+                    <Link to='/'>Cửa hàng</Link>
+                    {menu === "Cửa hàng" ? <hr /> : <div className="hr-placeholder" />}
+                </li>
+                <li onClick={() => setMenu("Đàn ông")}>
+                    <Link to='/mens'>Đàn ông</Link>
+                    {menu === "Đàn ông" ? <hr /> : <div className="hr-placeholder" />}
+                </li>
+                <li onClick={() => setMenu("Phụ nữ")}>
+                    <Link to='/womens'>Phụ nữ</Link>
+                    {menu === "Phụ nữ" ? <hr /> : <div className="hr-placeholder" />}
+                </li>
+                <li onClick={() => setMenu("Trẻ em")}>
+                    <Link to='/kids'>Trẻ em</Link>
+                    {menu === "Trẻ em" ? <hr /> : <div className="hr-placeholder" />}
+                </li>
             </ul>
 
             <div className="nav-actions">
@@ -103,11 +115,7 @@ const Navbar = () => {
                             <p className='nav-search-suggestion-title'>Gợi ý nhanh</p>
                             <ul>
                                 {filteredSuggestions.map((product) => (
-                                    <li
-                                        key={product.id}
-                                        className='nav-search-suggestion-item'
-                                        onClick={() => handleSelectSuggestion(product)}
-                                    >
+                                    <li key={product.id} className='nav-search-suggestion-item' onClick={() => handleSelectSuggestion(product)}>
                                         <img src={product.image} alt={product.name} />
                                         <div className='nav-search-suggestion-info'>
                                             <span className='nav-search-suggestion-name'>{product.name}</span>
@@ -124,17 +132,21 @@ const Navbar = () => {
 
                 <div className="nav-login-cart">
                     {user ? (
-                        <>
+                        <div className="nav-user-dropdown">
                             <Link to='/account' className='nav-user-name'>{user.name}</Link>
-                            <button onClick={handleLogout}>Đăng xuất</button>
-                        </>
+                            <div className="nav-user-dropdown-content">
+                                <Link to='/account'>Hồ sơ</Link>
+                                <Link to='/orders'>Lịch sử mua hàng</Link>
+                                <button onClick={handleLogout}>Đăng xuất</button>
+                            </div>
+                        </div>
                     ) : (
-                        <Link to='/login'><button>Đăng nhập</button></Link>
+                        <Link to='/login' style={{ textDecoration: 'none' }}><button>Đăng nhập</button></Link>
                     )}
-                    <Link to='/cart'>
+                    <Link to='/cart' className="nav-cart-link">
                         <img src={cart_icon} alt='Cart' />
+                        <div className="nav-cart-count">{getTotalCartItems()}</div>
                     </Link>
-                    <div className="nav-cart-count">{getTotalCartItems()}</div>
                 </div>
             </div>
         </div>

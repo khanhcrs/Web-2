@@ -180,6 +180,7 @@ const Checkout = () => {
           : 'pending';
 
       const payload = {
+        customerId: user ? user.id : null,
         customerName: formData.name.trim(),
         customerEmail: formData.email.trim(),
         items: items.map((item) => ({

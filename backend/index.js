@@ -506,6 +506,21 @@ const fetchuser = (req, res, next) => {
   }
 };
 
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Invalid token.' });
+  }
+};
+
 // ================== CART (cart_data JSONB trong users) ==================
 app.post('/addtocart', fetchuser, async (req, res) => {
   try {
@@ -598,6 +613,68 @@ const formatOrderResponse = (order, items = []) => ({
     quantity: item.quantity,
     price: Number(item.price),
   })),
+});
+
+// GET USER'S ORDERS
+app.get('/my-orders', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const ordersResult = await pool.query(
+            `SELECT o.id, o.order_id, o.status, o.total, o.created_at, u.name as user_name, u.email as user_email
+       FROM orders o
+       JOIN users u ON o.customer_id = u.id
+       WHERE o.customer_id = $1
+       ORDER BY o.created_at DESC`,
+            [userId]
+        );
+
+        const orders = ordersResult.rows;
+
+        if (orders.length === 0) {
+            return res.json([]);
+        }
+
+        const orderIds = orders.map(o => o.id);
+
+        const itemsResult = await pool.query(
+            `SELECT
+                oi.*,
+                COALESCE(p.image, p.images->>0) as image
+            FROM order_items oi
+            LEFT JOIN products p ON oi.product_id = p.id
+            WHERE oi.order_id = ANY($1::int[])`,
+            [orderIds]
+        );
+
+        const itemsByOrderId = {};
+        for (const item of itemsResult.rows) {
+            if (!itemsByOrderId[item.order_id]) {
+                itemsByOrderId[item.order_id] = [];
+            }
+            itemsByOrderId[item.order_id].push(item);
+        }
+
+        const formattedOrders = orders.map(order => {
+            const items = itemsByOrderId[order.id] || [];
+            return {
+                id: order.order_id,
+                created_at: order.created_at,
+                total_amount: order.total,
+                items: items.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    image: item.image,
+                })),
+            };
+        });
+
+        res.json(formattedOrders);
+    } catch (error) {
+        console.error('Error fetching user orders', error);
+        res.status(500).json({ success: false, message: 'Unable to fetch user orders.' });
+    }
 });
 
 // GET ORDERS

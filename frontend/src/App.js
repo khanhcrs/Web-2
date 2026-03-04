@@ -14,6 +14,7 @@ import kid_banner from './Components/assests/banner_kids.png';
 import Checkout from './Pages/Checkout'
 import SearchResults from './Pages/SearchResults'
 import AccountProfile from './Pages/AccountProfile'
+import OrderHistory from './Pages/OrderHistory'
 
 const AppRoutes = () => {
   const location = useLocation()
@@ -34,6 +35,7 @@ const AppRoutes = () => {
         <Route path='/cart' element={<Cart />} />
         <Route path='/checkout' element={<Checkout />} />
         <Route path='/account' element={<AccountProfile />} />
+        <Route path='/orders' element={<OrderHistory />} />
         <Route path='/login' element={<LoginSignup />} />
       </Routes>
       {!hideLayout && <Footer />}
