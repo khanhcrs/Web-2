@@ -59,7 +59,7 @@ Mặc định backend đang kết nối DB:
 - host: `localhost`
 - port: `5432`
 - user: `postgres`
-- password: `kt123456`
+- password: `123123`
 - database: `clothify`
 
 Bạn có thể tạo DB bằng lệnh:
