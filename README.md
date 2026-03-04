@@ -1,89 +1,253 @@
-# DOANKTPM Monorepo Quickstart
+# Web-2 (Clothify) – Hướng dẫn setup & chạy dự án đầy đủ
 
-This repository contains three separate apps that work together:
+Đây là monorepo gồm **3 ứng dụng chạy cùng nhau**:
 
-- `backend/` – Express + PostgreSQL API server.
-- `admin/` – React (Vite) admin dashboard.
-- `frontend/` – React storefront built with Create React App.
+- `backend/`: API server dùng **Node.js + Express + PostgreSQL**.
+- `frontend/`: website khách hàng (React + CRA).
+- `admin/`: trang quản trị (React + Vite).
 
-The backend now seeds a default admin account for convenience:
+---
+
+## 1) Yêu cầu môi trường
+
+Cài sẵn các công cụ sau:
+
+- **Node.js**: khuyến nghị `v18` hoặc `v20`.
+- **npm**: đi kèm Node.js.
+- **PostgreSQL**: khuyến nghị `v14+`.
+- (Tuỳ chọn) `psql` hoặc PgAdmin để import schema.
+
+Kiểm tra nhanh:
+
+```bash
+node -v
+npm -v
+psql --version
+```
+
+---
+
+## 2) Clone source code
+
+```bash
+git clone <REPO_URL>
+cd Web-2
+```
+
+> Nếu bạn đã có source, chỉ cần vào đúng thư mục dự án rồi pull code mới nhất.
+
+---
+
+## 3) Cài dependencies cho từng app
+
+Chạy từ thư mục gốc `Web-2`:
+
+```bash
+npm install --prefix backend
+npm install --prefix frontend
+npm install --prefix admin
+```
+
+---
+
+## 4) Chuẩn bị PostgreSQL database
+
+### 4.1 Tạo database
+
+Mặc định backend đang kết nối DB:
+
+- host: `localhost`
+- port: `5432`
+- user: `postgres`
+- password: `kt123456`
+- database: `clothify`
+
+Bạn có thể tạo DB bằng lệnh:
+
+```bash
+createdb -U postgres clothify
+```
+
+Hoặc trong `psql`:
+
+```sql
+CREATE DATABASE clothify;
+```
+
+### 4.2 Import schema
+
+File schema có sẵn tại: `backend/db.sql`.
+
+```bash
+psql -U postgres -d clothify -f backend/db.sql
+```
+
+Schema này tạo các bảng:
+
+- `users`
+- `products`
+- `orders`
+- `order_items`
+
+### 4.3 Lưu ý tài khoản admin mặc định
+
+Khi backend chạy lần đầu, hệ thống sẽ tự seed tài khoản admin nếu chưa có:
 
 - Email: `admin@clothify.com`
 - Password: `Admin@123`
 
-After logging in with this account on the storefront, you will be redirected to the admin dashboard.
+Ngoài ra có thể override bằng biến môi trường:
 
-Follow the steps below if you just pulled the project and want to run everything locally without copying files around manually.
+- `ADMIN_EMAIL`
+- `ADMIN_NAME`
+- `ADMIN_PASSWORD`
 
-## 1. Clone or update the repository
+---
 
-```bash
-# clone once
-git clone https://github.com/hientranc2/DOANKTPM.git
-cd DOANKTPM
+## 5) Cấu hình môi trường (khuyến nghị)
 
-# or, if you already have a clone, just pull the latest changes
-git pull
+Hiện tại backend dùng cấu hình PostgreSQL hard-code trong `backend/index.js`.
+Nếu máy bạn dùng thông tin DB khác, sửa trực tiếp đoạn `new Pool({...})` trong file này.
+
+Về API URL:
+
+- Frontend mặc định gọi API tại `http://localhost:4000`.
+- Admin mặc định gọi API tại `http://localhost:4000`.
+
+Bạn có thể đổi bằng biến môi trường:
+
+### Frontend (`frontend/.env`)
+
+```env
+REACT_APP_API_BASE_URL=http://localhost:4000
+REACT_APP_ADMIN_PORTAL_URL=http://localhost:5173
 ```
 
-> ✅ Using `git clone`/`git pull` is the easiest way to get every file at once—no need to download them one by one.
+### Admin (`admin/.env`)
 
-## 2. Install dependencies for each app (one time)
-
-From the repository root run:
-
-```bash
-# install backend dependencies
-npm install --prefix backend
-
-# install admin dependencies
-npm install --prefix admin
-
-# install storefront dependencies
-npm install --prefix frontend
+```env
+VITE_API_BASE_URL=http://localhost:4000
 ```
 
-> You only need to reinstall when `package.json` changes. Otherwise you can skip this step on subsequent runs.
+---
 
-## 3. Start the services
+## 6) Chạy dự án ở chế độ development
 
-Open three terminals (or use tools like `tmux`) and run one command per terminal:
+### Cách A: chạy từng service (khuyên dùng khi debug)
+
+Mở **3 terminal** tại thư mục gốc dự án.
+
+**Terminal 1 – Backend**
 
 ```bash
-# terminal 1 – API server
-npm start --prefix backend  # or: node index.js
+npm start --prefix backend
+```
 
-# terminal 2 – admin dashboard (Vite)
+Backend chạy ở: `http://localhost:4000`
+
+**Terminal 2 – Admin**
+
+```bash
 npm run dev --prefix admin
+```
 
-# terminal 3 – storefront (CRA)
+Admin thường chạy ở: `http://localhost:5173`
+
+**Terminal 3 – Frontend**
+
+```bash
 npm start --prefix frontend
 ```
 
-Each application uses its own dev server, so keep the terminals running while you work.
+Frontend thường chạy ở: `http://localhost:3000`
 
-### Optional: launch everything from one script
+---
 
-If you prefer a single command, you can use the provided helper script:
+### Cách B: chạy tất cả bằng 1 lệnh
+
+Dự án có script tiện ích:
 
 ```bash
 ./scripts/dev-all.sh
 ```
 
-It will spawn three background processes (backend, admin, storefront) and tail their output. Press <kbd>Ctrl+C</kbd> to stop them all at once.
+Script sẽ tự khởi chạy backend + admin + frontend và dừng toàn bộ khi nhấn `Ctrl + C`.
 
-> The script relies only on Bash—no extra Node packages are required.
+---
 
-## 4. Environment variables
+## 7) Kiểm tra nhanh sau khi chạy
 
-- The backend expects PostgreSQL connection variables (see `backend/index.js`). Create a `.env` file in `backend/` with PostgreSQL credentials (user, password, host, port, database).
-- Ensure PostgreSQL is running and the database exists with the required tables schema.
-- The frontends read their configuration from their respective `.env` files if needed (e.g. API base URL).
+1. Mở `http://localhost:3000` (storefront).
+2. Mở `http://localhost:5173` (admin).
+3. Gọi thử API:
 
-## Troubleshooting
+```bash
+curl http://localhost:4000/
+```
 
-- **Ports already in use** – Stop any lingering dev servers or adjust the ports in the respective configuration files.
-- **Dependency errors** – Delete the relevant `node_modules/` folder and reinstall with `npm install --prefix <app>`.
-- **Accessing the API** – By default the backend listens on port `4000`. Update the frontends' API URLs if you run the server on a different port.
+Nếu OK sẽ trả về:
 
-Happy building!
+```text
+Express App is running with PostgreSQL
+```
+
+---
+
+## 8) Build production
+
+```bash
+npm run build --prefix frontend
+npm run build --prefix admin
+```
+
+Backend là Node server nên deploy bằng cách chạy:
+
+```bash
+npm start --prefix backend
+```
+
+> Khi deploy thật, nhớ cấu hình domain, HTTPS, reverse proxy (Nginx), và thông tin DB phù hợp môi trường production.
+
+---
+
+## 9) Các lỗi thường gặp & cách xử lý
+
+### Lỗi kết nối PostgreSQL
+
+- Kiểm tra PostgreSQL đã chạy chưa.
+- Kiểm tra đúng user/password/database trong `backend/index.js`.
+- Kiểm tra đã import `backend/db.sql` chưa.
+
+### Port bị trùng
+
+- `3000`, `4000`, `5173` đang bị app khác dùng.
+- Tắt app đang chiếm port hoặc đổi port cấu hình.
+
+### Frontend/Admin không load được ảnh
+
+- Kiểm tra backend đang chạy.
+- Kiểm tra URL API trong `frontend/src/config.js` và `admin/src/config.js`.
+- Kiểm tra đường dẫn ảnh trả về từ backend có prefix `/images/...`.
+
+### Login admin nhưng không vào trang quản trị
+
+- Xác nhận đăng nhập bằng tài khoản có role `admin`.
+- Kiểm tra admin app (`5173`) đang chạy.
+
+---
+
+## 10) Gợi ý quy trình setup nhanh cho máy mới
+
+```bash
+# 1) Cài dependencies
+npm install --prefix backend && npm install --prefix frontend && npm install --prefix admin
+
+# 2) Tạo DB + import schema
+createdb -U postgres clothify
+psql -U postgres -d clothify -f backend/db.sql
+
+# 3) Chạy cả 3 service
+./scripts/dev-all.sh
+```
+
+Chúc bạn setup thành công 🚀
