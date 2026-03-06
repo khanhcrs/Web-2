@@ -1,15 +1,15 @@
-import React, { useState } from 'react'
-import './DescriptionBox.css'
+import React, { useState } from 'react';
+import './DescriptionBox.css';
 
 const sizeChartRows = [
     { label: '(1) DÀI ÁO', s: '61', m: '64', l: '67', xl: '70' },
     { label: '(2) NGANG VAI', s: '53', m: '55.5', l: '58', xl: '60.5' },
     { label: '(3) NGANG THÂN', s: '59', m: '62', l: '65', xl: '68' },
     { label: '(4) DÀI TAY', s: '17', m: '18', l: '19', xl: '20' }
-]
+];
 
 const DescriptionBox = () => {
-    const [activeTab, setActiveTab] = useState('description')
+    const [activeTab, setActiveTab] = useState('description');
 
     const renderContent = () => {
         if (activeTab === 'size-chart') {
@@ -43,12 +43,10 @@ const DescriptionBox = () => {
                     </table>
                     <p className="size-chart-note">*Thông số thực tế có thể chênh lệch 0.5 - 1cm</p>
                 </div>
-            )
+            );
         }
 
-        if (activeTab === 'reviews') {
-            return <p>Đánh giá sản phẩm đang được cập nhật.</p>
-        }
+        // Đã xóa hàm if (activeTab === 'reviews') ở đây
 
         return (
             <>
@@ -62,8 +60,8 @@ const DescriptionBox = () => {
                     Mỗi sản phẩm đều có trang riêng với thông tin liên quan, đánh giá từ khách hàng và tuỳ chọn mua hàng để giúp người mua đưa ra quyết định chính xác.
                 </p>
             </>
-        )
-    }
+        );
+    };
 
     return (
         <div className='descriptionbox'>
@@ -82,19 +80,13 @@ const DescriptionBox = () => {
                 >
                     Size chart
                 </button>
-                <button
-                    type="button"
-                    className={`descriptionbox-nav-box ${activeTab === 'reviews' ? 'active' : 'fade'}`}
-                    onClick={() => setActiveTab('reviews')}
-                >
-                    Đánh giá (122)
-                </button>
+                {/* Đã xóa nút bấm Tab Đánh giá ở đây để nhường chỗ cho Component Đánh giá thật */}
             </div>
             <div className="descriptionbox-description">
                 {renderContent()}
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default DescriptionBox
+export default DescriptionBox;

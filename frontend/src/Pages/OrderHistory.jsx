@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AuthContext } from '../Context/AuthContext';
 import './CSS/OrderHistory.css';
-import { resolveImageUrl } from '../config';
+import { resolveImageUrl, API_BASE_URL } from '../config';
 
 const OrderHistory = () => {
   const { token } = useContext(AuthContext);
@@ -18,7 +19,7 @@ const OrderHistory = () => {
       }
 
       try {
-        const response = await fetch('http://localhost:4000/my-orders', {
+        const response = await fetch(`${API_BASE_URL}/my-orders`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -57,27 +58,29 @@ const OrderHistory = () => {
           <p>You have no orders.</p>
         ) : (
           orders.map(order => (
-            <div key={order.id} className="order-item">
-              <div className="order-item-header">
-                <h3>Order #{order.id}</h3>
-                <p>Date: {new Date(order.created_at).toLocaleDateString()}</p>
-              </div>
-              <div className="order-item-body">
-                {order.items.map(item => (
-                  <div key={item.id} className="order-product">
-                    <img src={resolveImageUrl(item.image)} alt={item.name} />
-                    <div className="order-product-info">
-                      <p>{item.name}</p>
-                      <p>Quantity: {item.quantity}</p>
-                      <p>Price: {item.price.toLocaleString('vi-VN')} ₫</p>
+            <Link to={`/order/${order.id}`} key={order.id} className="order-item-link">
+              <div className="order-item">
+                <div className="order-item-header">
+                  <h3>Order #{order.id}</h3>
+                  <p>Date: {new Date(order.created_at).toLocaleDateString()}</p>
+                </div>
+                <div className="order-item-body">
+                  {order.items.map(item => (
+                    <div key={item.id} className="order-product">
+                      <img src={resolveImageUrl(item.image)} alt={item.name} />
+                      <div className="order-product-info">
+                        <p>{item.name}</p>
+                        <p>Quantity: {item.quantity}</p>
+                        <p>Price: {item.price.toLocaleString('vi-VN')} ₫</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="order-item-footer">
+                  <p>Total: {order.total_amount.toLocaleString('vi-VN')} ₫</p>
+                </div>
               </div>
-              <div className="order-item-footer">
-                <p>Total: {order.total_amount.toLocaleString('vi-VN')} ₫</p>
-              </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

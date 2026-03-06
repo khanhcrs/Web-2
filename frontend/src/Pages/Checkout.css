@@ -181,8 +181,17 @@
 .checkout-success-item {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   color: #333;
+}
+
+.checkout-success-item-image {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #eee;
 }
 
 .checkout-success-item-size {

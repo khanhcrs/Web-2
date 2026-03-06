@@ -1,4 +1,4 @@
-const port = 4000;
+const port = 4001;
 const express = require('express');
 const app = express();
 const { Pool } = require('pg');
@@ -20,9 +20,9 @@ app.use(cors());
 // ================== PostgreSQL CONNECTION ==================
 const pool = new Pool({
   user: 'postgres',
-  host: 'localhost',      // hoặc '127.0.0.1'
-  database: 'clothify',   // đúng TÊN DB bạn tạo
-  password: 'kt123456',   // ***GIỐNG HỆT*** mật khẩu ở bước 1
+  host: 'localhost',
+  database: 'clothify',
+  password: 'kt123456',
   port: 5432,
 });
 
@@ -41,6 +41,25 @@ const ensureSchemaAndAdminUser = async () => {
     ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb
   `);
 
+  // THÊM CỘT CHO ĐƠN HÀNG
+  await pool.query(`
+    ALTER TABLE orders 
+    ADD COLUMN IF NOT EXISTS shipping_address JSONB,
+    ADD COLUMN IF NOT EXISTS shipping_method VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(255)
+  `);
+  // Thêm bảng reviews vào cơ sở dữ liệu
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS reviews (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    user_name VARCHAR(255),
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  `);
   await pool.query(`
     UPDATE products
     SET images = CASE
@@ -104,10 +123,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Static path
 app.use('/images', express.static(path.join(__dirname, 'upload', 'images')));
 
-// Upload endpoint
 app.post('/upload', upload.single('product'), (req, res) => {
   console.log(req.file);
   res.json({
@@ -118,7 +135,6 @@ app.post('/upload', upload.single('product'), (req, res) => {
 
 // ================== PRODUCTS ==================
 
-// ADD PRODUCT
 app.post('/addproduct', async (req, res) => {
   try {
     const { name, image, images = [], category, new_price, old_price } = req.body;
@@ -152,7 +168,6 @@ app.post('/addproduct', async (req, res) => {
   }
 });
 
-// REMOVE PRODUCT
 app.post('/removeproduct', async (req, res) => {
   try {
     const { id } = req.body;
@@ -177,7 +192,6 @@ app.post('/removeproduct', async (req, res) => {
   }
 });
 
-// UPDATE PRODUCT
 app.put('/product/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -251,7 +265,6 @@ app.put('/product/:id', async (req, res) => {
   }
 });
 
-// GET ALL PRODUCTS
 app.get('/allproducts', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY date DESC');
@@ -264,7 +277,6 @@ app.get('/allproducts', async (req, res) => {
 
 // ================== AUTH & USERS ==================
 
-// REGISTER
 app.post('/register', async (req, res) => {
   try {
     let { name, email, password } = req.body;
@@ -313,7 +325,6 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// LOGIN
 app.post('/login', async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -363,7 +374,6 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// GET USERS (không trả password)
 app.get('/users', async (req, res) => {
   try {
     const result = await pool.query(
@@ -386,7 +396,6 @@ app.get('/users', async (req, res) => {
   }
 });
 
-// UPDATE USER STATUS
 app.patch('/users/:userId/status', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -436,7 +445,6 @@ app.patch('/users/:userId/status', async (req, res) => {
   }
 });
 
-// UPDATE USER ROLE
 app.patch('/users/:userId/role', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -499,7 +507,7 @@ const fetchuser = (req, res, next) => {
       return res.status(401).json({ error: "No token, authorization denied" });
     }
     const data = jwt.verify(token, JWT_SECRET);
-    req.user = data; // { id, email }
+    req.user = data;
     next();
   } catch (error) {
     return res.status(401).json({ error: "Token is not valid" });
@@ -521,7 +529,7 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// ================== CART (cart_data JSONB trong users) ==================
+// ================== CART ==================
 app.post('/addtocart', fetchuser, async (req, res) => {
   try {
     const { itemId, size } = req.body;
@@ -617,67 +625,133 @@ const formatOrderResponse = (order, items = []) => ({
 
 // GET USER'S ORDERS
 app.get('/my-orders', authMiddleware, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const ordersResult = await pool.query(
-            `SELECT o.id, o.order_id, o.status, o.total, o.created_at, u.name as user_name, u.email as user_email
+  try {
+    const userId = req.user.id;
+    const ordersResult = await pool.query(
+      `SELECT o.id, o.order_id, o.status, o.total, o.created_at, u.name as user_name, u.email as user_email
        FROM orders o
        JOIN users u ON o.customer_id = u.id
        WHERE o.customer_id = $1
        ORDER BY o.created_at DESC`,
-            [userId]
-        );
+      [userId]
+    );
 
-        const orders = ordersResult.rows;
+    const orders = ordersResult.rows;
 
-        if (orders.length === 0) {
-            return res.json([]);
-        }
+    if (orders.length === 0) {
+      return res.json([]);
+    }
 
-        const orderIds = orders.map(o => o.id);
+    const orderIds = orders.map(o => o.id);
 
-        const itemsResult = await pool.query(
-            `SELECT
+    const itemsResult = await pool.query(
+      `SELECT
                 oi.*,
                 COALESCE(p.image, p.images->>0) as image
             FROM order_items oi
             LEFT JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = ANY($1::int[])`,
-            [orderIds]
-        );
+      [orderIds]
+    );
 
-        const itemsByOrderId = {};
-        for (const item of itemsResult.rows) {
-            if (!itemsByOrderId[item.order_id]) {
-                itemsByOrderId[item.order_id] = [];
-            }
-            itemsByOrderId[item.order_id].push(item);
-        }
-
-        const formattedOrders = orders.map(order => {
-            const items = itemsByOrderId[order.id] || [];
-            return {
-                id: order.order_id,
-                created_at: order.created_at,
-                total_amount: order.total,
-                items: items.map(item => ({
-                    id: item.id,
-                    name: item.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                    image: item.image,
-                })),
-            };
-        });
-
-        res.json(formattedOrders);
-    } catch (error) {
-        console.error('Error fetching user orders', error);
-        res.status(500).json({ success: false, message: 'Unable to fetch user orders.' });
+    const itemsByOrderId = {};
+    for (const item of itemsResult.rows) {
+      if (!itemsByOrderId[item.order_id]) {
+        itemsByOrderId[item.order_id] = [];
+      }
+      itemsByOrderId[item.order_id].push(item);
     }
+
+    const formattedOrders = orders.map(order => {
+      const items = itemsByOrderId[order.id] || [];
+      return {
+        id: order.order_id,
+        created_at: order.created_at,
+        total_amount: order.total,
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          image: item.image,
+        })),
+      };
+    });
+
+    res.json(formattedOrders);
+  } catch (error) {
+    console.error('Error fetching user orders', error);
+    res.status(500).json({ success: false, message: 'Unable to fetch user orders.' });
+  }
 });
 
-// GET ORDERS
+// GET ORDER by ID (CHÍNH XÁC NHẤT, TRẢ VỀ ĐẦY ĐỦ THÔNG TIN NGƯỜI NHẬN)
+app.get('/order/:orderId', authMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.id;
+
+    const orderResult = await pool.query(
+      `SELECT 
+        o.id, 
+        o.order_id, 
+        o.status, 
+        o.total, 
+        o.created_at, 
+        o.shipping_address,
+        o.shipping_method,
+        o.payment_method,
+        u.name as user_name, 
+        u.email as user_email
+      FROM orders o
+      JOIN users u ON o.customer_id = u.id
+      WHERE o.order_id = $1 AND o.customer_id = $2`,
+      [orderId, userId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    const order = orderResult.rows[0];
+
+    const itemsResult = await pool.query(
+      `SELECT
+          oi.*,
+          COALESCE(p.image, p.images->>0) as image
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = $1`,
+      [order.id]
+    );
+
+    const items = itemsResult.rows.map(item => ({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      image: item.image,
+    }));
+
+    const response = {
+      id: order.order_id,
+      created_at: order.created_at,
+      status: order.status,
+      total_amount: order.total,
+      shipping_address: order.shipping_address, // Đã giữ nguyên cấu trúc JSONB
+      shipping_method: order.shipping_method,
+      payment_method: order.payment_method,
+      items: items,
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching order details', error);
+    res.status(500).json({ success: false, message: 'Unable to fetch order details.' });
+  }
+});
+
+// GET ALL ORDERS (DÀNH CHO ADMIN)
 app.get('/orders', async (req, res) => {
   try {
     const ordersResult = await pool.query(
@@ -719,82 +793,60 @@ app.get('/orders', async (req, res) => {
   }
 });
 
-// CREATE ORDER
+// CREATE ORDER (ĐÃ THÊM LOGIC LƯU ĐỊA CHỈ & SĐT TỪ CHECKOUT)
 app.post('/orders', async (req, res) => {
   try {
-    const { customerId, customerName, customerEmail, items = [], total = 0, status = 'pending' } = req.body;
+    const {
+      customerId,
+      customerName,
+      customerEmail,
+      customerPhone, // Nhận trường SĐT
+      items = [],
+      total = 0,
+      status = 'pending',
+      shippingAddress, // Nhận trường Địa chỉ
+      paymentMethod
+    } = req.body;
 
-    const allowedStatuses = ['pending', 'processing', 'shipped'];
-    const normalizedStatus = allowedStatuses.includes(status) ? status : 'pending';
-
-    const lastOrder = await pool.query(
-      'SELECT order_id FROM orders ORDER BY order_id DESC LIMIT 1'
-    );
+    const lastOrder = await pool.query('SELECT order_id FROM orders ORDER BY order_id DESC LIMIT 1');
     const nextOrderId = lastOrder.rowCount > 0 ? lastOrder.rows[0].order_id + 1 : 1;
 
-    let customer_id = null;
-    let resolvedName = customerName || null;
-    let resolvedEmail = customerEmail || null;
-    let user_status = null;
-
-    if (customerId) {
-      const userResult = await pool.query(
-        'SELECT id, name, email, status FROM users WHERE id = $1',
-        [customerId]
-      );
-      if (userResult.rowCount > 0) {
-        const user = userResult.rows[0];
-        customer_id = user.id;
-        resolvedName = user.name;
-        resolvedEmail = user.email;
-        user_status = user.status;
-      }
-    }
-
-    const sanitizedItems = Array.isArray(items)
-      ? items.map((item) => ({
-        product_id: item.productId,
-        name: item.name,
-        quantity: Number(item.quantity) || 0,
-        price: Number(item.price) || 0,
-      }))
-      : [];
-
-    const parsedTotal = Number(total) || 0;
+    // Gói tất cả vào JSONB để insert vào Postgres
+    const shippingAddressObj = {
+      name: customerName,
+      email: customerEmail,
+      phone: customerPhone || "Chưa cập nhật",
+      address: shippingAddress
+    };
 
     const orderInsert = await pool.query(
-      `INSERT INTO orders (order_id, customer_id, customer_name, customer_email, total, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO orders (order_id, customer_id, customer_name, customer_email, total, status, shipping_address, shipping_method, payment_method)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [nextOrderId, customer_id, resolvedName, resolvedEmail, parsedTotal, normalizedStatus]
+      [
+        nextOrderId,
+        customerId,
+        customerName,
+        customerEmail,
+        total,
+        status,
+        JSON.stringify(shippingAddressObj), // Lưu cứng vào DB
+        "Giao hàng tiêu chuẩn",
+        paymentMethod
+      ]
     );
 
     const orderDb = orderInsert.rows[0];
 
-    for (const item of sanitizedItems) {
+    for (const item of items) {
       await pool.query(
         `INSERT INTO order_items (order_id, product_id, name, quantity, price)
          VALUES ($1, $2, $3, $4, $5)`,
-        [orderDb.id, item.product_id, item.name, item.quantity, item.price]
+        [orderDb.id, item.productId, item.name, item.quantity, item.price]
       );
     }
 
-    const formatted = formatOrderResponse(
-      {
-        ...orderDb,
-        user_name: resolvedName,
-        user_email: resolvedEmail,
-        user_status: user_status,
-      },
-      sanitizedItems.map(i => ({
-        product_id: i.product_id,
-        name: i.name,
-        quantity: i.quantity,
-        price: i.price,
-      }))
-    );
-
-    res.json({ success: true, order: formatted });
+    res.json({ success: true, order: orderDb });
   } catch (error) {
     console.error('Error creating order', error);
     res.status(500).json({ success: false, message: 'Unable to create order.' });
@@ -846,9 +898,46 @@ app.patch('/orders/:orderId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Unable to update order.' });
   }
 });
+// ================== REVIEWS APIs ==================
+// ĐÃ ĐỔI THÀNH FETCHUSER
+app.post('/addreview', fetchuser, async (req, res) => {
+  try {
+    const { productId, rating, comment } = req.body;
+    const userId = req.user.id;
 
+    const userResult = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
+    }
+    const userName = userResult.rows[0].name;
+
+    const insertResult = await pool.query(
+      `INSERT INTO reviews (product_id, user_id, user_name, rating, comment) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [productId, userId, userName, rating, comment]
+    );
+
+    res.json({ success: true, review: insertResult.rows[0] });
+  } catch (error) {
+    console.error('Lỗi khi thêm đánh giá:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+app.get('/reviews/:productId', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM reviews WHERE product_id = $1 ORDER BY created_at DESC',
+      [req.params.productId]
+    );
+    res.json({ success: true, reviews: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false });
+  }
+});
 // ================== START SERVER ==================
 app.listen(port, (error) => {
+  ``
   if (!error) console.log(`Server is running on port ${port}`);
   else console.log("Error occurred, server can't start", error);
 });
