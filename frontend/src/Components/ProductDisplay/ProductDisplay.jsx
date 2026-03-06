@@ -5,6 +5,8 @@ import star_dull_icon from '../assests/star_dull_icon.png'
 import { ShopContext } from '../../Context/ShopContext'
 import { resolveImageUrl } from '../../config'
 import { useNavigate } from 'react-router-dom'
+// 1. IMPORT COMPONENT ĐÁNH GIÁ VÀO ĐÂY
+import ProductReview from '../ProductReview/ProductReview'
 
 const ProductDisplay = (props) => {
   const { product } = props
@@ -36,6 +38,7 @@ const ProductDisplay = (props) => {
 
     return normalized.length ? normalized : primary ? [primary] : []
   }, [product])
+
   const [activeImage, setActiveImage] = useState(resolvedImages[0] || '')
   const [selectedSize, setSelectedSize] = useState(null)
   const [quantity, setQuantity] = useState(1)
@@ -88,137 +91,142 @@ const ProductDisplay = (props) => {
   const productImage = activeImage || resolvedImages[0] || resolveImageUrl(product?.image)
 
   return (
-    <div className='productdisplay'>
-      <div className='productdisplay-left'>
-        <div className='productdisplay-img-list'>
-          {resolvedImages.map((img) => (
-            <button
-              key={img}
-              type='button'
-              className={
-                img === activeImage
-                  ? 'productdisplay-thumbnail active'
-                  : 'productdisplay-thumbnail'
-              }
-              onClick={() => setActiveImage(img)}
-            >
-              <img src={img} alt='Hình sản phẩm' />
-            </button>
-          ))}
-        </div>
-        <div className='prodcutdisplay-img'>
-          <img className='prodcutdisplay-main-img' src={activeImage} alt='' />
-        </div>
-      </div>
-      <div className='productdisplay-right'>
-        <h1>{product.name}</h1>
-        <div className='productdisplay-right-star'>
-          <img src={star_icon} alt='' />
-          <img src={star_icon} alt='' />
-          <img src={star_icon} alt='' />
-          <img src={star_icon} alt='' />
-          <img src={star_dull_icon} alt='' />
-          <p>(122)</p>
-        </div>
-        <div className='productdisplay-right-prices'>
-          <div className='productdisplay-right-price-old'>
-            {product.old_price}đ
-          </div>
-          <div className='productdisplay-right-price-new'>
-            {product.new_price}đ
-          </div>
-        </div>
-        <div className='productdisplay-right-description'></div>
-        <div className='productdisplay-right-size'>
-          <h1>Chọn kích thước</h1>
-          <div className='productdisplay-right-sizes'>
-            {sizeOptions.map((size) => (
+    // THÊM MỘT DIV BỌC TỔNG THỂ TẠI ĐÂY
+    <div className='product-page-container'>
+      <div className='productdisplay'>
+        <div className='productdisplay-left'>
+          <div className='productdisplay-img-list'>
+            {resolvedImages.map((img) => (
               <button
+                key={img}
                 type='button'
-                key={size}
                 className={
-                  size === selectedSize
-                    ? 'productdisplay-size-option selected'
-                    : 'productdisplay-size-option'
+                  img === activeImage
+                    ? 'productdisplay-thumbnail active'
+                    : 'productdisplay-thumbnail'
                 }
-                onClick={() => {
-                  setSelectedSize(size)
-                  setSizeError('')
-                }}
+                onClick={() => setActiveImage(img)}
               >
-                {size}
+                <img src={img} alt='Hình sản phẩm' />
               </button>
             ))}
           </div>
-          {sizeError && <p className='productdisplay-size-error'>{sizeError}</p>}
-        </div>
-        <div className='productdisplay-quantity'>
-          <span>Số lượng</span>
-          <div className='productdisplay-quantity-controls'>
-            <button
-              type='button'
-              onClick={() => handleQuantityChange(-1)}
-              aria-label='Giảm số lượng'
-            >
-              −
-            </button>
-            <span className='productdisplay-quantity-value'>{quantity}</span>
-            <button
-              type='button'
-              onClick={() => handleQuantityChange(1)}
-              aria-label='Tăng số lượng'
-            >
-              +
-            </button>
+          <div className='prodcutdisplay-img'>
+            <img className='prodcutdisplay-main-img' src={activeImage} alt='' />
           </div>
         </div>
-        <button onClick={handleAddToCart}>THÊM VÀO GIỎ</button>
-        <p className='productdisplay-right-category'>
-          <span>Danh mục: </span>Phụ nữ, Áo thun, Áo croptop
-        </p>
-        <p className='productdisplay-right-category'>
-          <span>Thẻ: </span>Hiện đại, Mới nhất
-        </p>
+
+        <div className='productdisplay-right'>
+          <h1>{product.name}</h1>
+          <div className='productdisplay-right-star'>
+            <img src={star_icon} alt='' />
+            <img src={star_icon} alt='' />
+            <img src={star_icon} alt='' />
+            <img src={star_icon} alt='' />
+            <img src={star_dull_icon} alt='' />
+            <p>(122)</p>
+          </div>
+          <div className='productdisplay-right-prices'>
+            <div className='productdisplay-right-price-old'>
+              {product.old_price}đ
+            </div>
+            <div className='productdisplay-right-price-new'>
+              {product.new_price}đ
+            </div>
+          </div>
+          <div className='productdisplay-right-description'></div>
+          <div className='productdisplay-right-size'>
+            <h1>Chọn kích thước</h1>
+            <div className='productdisplay-right-sizes'>
+              {sizeOptions.map((size) => (
+                <button
+                  type='button'
+                  key={size}
+                  className={
+                    size === selectedSize
+                      ? 'productdisplay-size-option selected'
+                      : 'productdisplay-size-option'
+                  }
+                  onClick={() => {
+                    setSelectedSize(size)
+                    setSizeError('')
+                  }}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+            {sizeError && <p className='productdisplay-size-error'>{sizeError}</p>}
+          </div>
+          <div className='productdisplay-quantity'>
+            <span>Số lượng</span>
+            <div className='productdisplay-quantity-controls'>
+              <button
+                type='button'
+                onClick={() => handleQuantityChange(-1)}
+                aria-label='Giảm số lượng'
+              >
+                −
+              </button>
+              <span className='productdisplay-quantity-value'>{quantity}</span>
+              <button
+                type='button'
+                onClick={() => handleQuantityChange(1)}
+                aria-label='Tăng số lượng'
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <button onClick={handleAddToCart}>THÊM VÀO GIỎ</button>
+        </div>
+
+        {isFeedbackModalOpen && (
+          <div className='productdisplay-feedback-backdrop'>
+            <div className='productdisplay-feedback-modal' role='alertdialog' aria-modal='true'>
+              <button
+                type='button'
+                className='productdisplay-feedback-close'
+                onClick={handleCloseFeedbackModal}
+                aria-label='Đóng thông báo'
+              >
+                ×
+              </button>
+              <div className='productdisplay-feedback-icon'>✓</div>
+              <h2>Thêm vào giỏ hàng thành công</h2>
+              <div className='productdisplay-feedback-product-info'>
+                <img
+                  className='productdisplay-feedback-product-image'
+                  src={productImage}
+                  alt={product.name}
+                />
+                <div className='productdisplay-feedback-product-details'>
+                  <p className='productdisplay-feedback-product'>{product.name}</p>
+                  {selectedSize && (
+                    <p className='productdisplay-feedback-size'>Kích thước: {selectedSize}</p>
+                  )}
+                  <p className='productdisplay-feedback-quantity'>Số lượng: {quantity}</p>
+                </div>
+              </div>
+              <div className='productdisplay-feedback-actions'>
+                <button type='button' className='continue' onClick={handleContinueShopping}>
+                  Tiếp tục mua sắm
+                </button>
+                <button type='button' className='view-cart' onClick={handleViewCart}>
+                  Xem giỏ hàng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      {isFeedbackModalOpen && (
-        <div className='productdisplay-feedback-backdrop'>
-          <div className='productdisplay-feedback-modal' role='alertdialog' aria-modal='true'>
-            <button
-              type='button'
-              className='productdisplay-feedback-close'
-              onClick={handleCloseFeedbackModal}
-              aria-label='Đóng thông báo'
-            >
-              ×
-            </button>
-            <div className='productdisplay-feedback-icon'>✓</div>
-            <h2>Thêm vào giỏ hàng thành công</h2>
-            <div className='productdisplay-feedback-product-info'>
-              <img
-                className='productdisplay-feedback-product-image'
-                src={productImage}
-                alt={product.name}
-              />
-            <div className='productdisplay-feedback-product-details'>
-              <p className='productdisplay-feedback-product'>{product.name}</p>
-              {selectedSize && (
-                <p className='productdisplay-feedback-size'>Kích thước: {selectedSize}</p>
-              )}
-              <p className='productdisplay-feedback-quantity'>Số lượng: {quantity}</p>
-            </div>
-            </div>
-            <div className='productdisplay-feedback-actions'>
-              <button type='button' className='continue' onClick={handleContinueShopping}>
-                Tiếp tục mua sắm
-              </button>
-              <button type='button' className='view-cart' onClick={handleViewCart}>
-                Xem giỏ hàng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+
+      {/* 2. CHÈN COMPONENT ĐÁNH GIÁ Ở ĐÂY, NGAY BÊN DƯỚI PHẦN CHI TIẾT SẢN PHẨM */}
+      <div className="product-review-wrapper" style={{ marginTop: '50px', padding: '0 20px' }}>
+        <ProductReview productId={product.id} />
+      </div>
+
+    </div> // ĐÓNG THẺ BỌC TỔNG THỂ
   )
 }
 

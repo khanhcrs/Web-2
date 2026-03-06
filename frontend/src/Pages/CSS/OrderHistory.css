@@ -1,63 +1,56 @@
 .order-history {
   padding: 20px;
 }
-
 .order-history h1 {
   text-align: center;
   margin-bottom: 20px;
 }
-
 .order-history-container {
   max-width: 800px;
   margin: 0 auto;
 }
-
+.order-item-link {
+  text-decoration: none;
+  color: inherit;
+}
 .order-item {
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
+  padding: 20px;
   border-radius: 5px;
   margin-bottom: 20px;
-  padding: 15px;
+  transition: box-shadow 0.3s;
 }
-
+.order-item:hover {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
 .order-item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
   margin-bottom: 10px;
 }
-
-.order-item-header h3 {
-  margin: 0;
-}
-
 .order-item-body {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
 }
-
 .order-product {
   display: flex;
-  gap: 15px;
+  align-items: center;
 }
-
 .order-product img {
   width: 80px;
   height: 80px;
   object-fit: cover;
+  margin-right: 10px;
 }
-
-.order-product-info {
-  display: flex;
-  flex-direction: column;
-}
-
 .order-item-footer {
-  border-top: 1px solid #eee;
-  padding-top: 10px;
-  margin-top: 10px;
   text-align: right;
+  margin-top: 20px;
   font-weight: bold;
+}
+.order-product-info p {
+    margin: 0;
+    font-size: 14px;
 }
