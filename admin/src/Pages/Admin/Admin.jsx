@@ -7,6 +7,9 @@ import ListProduct from '../../Components/ListProduct/ListProduct'
 import OrderManagement from '../../Components/OrderManagement/OrderManagement'
 import Dashboard from '../../Components/Dashboard/Dashboard'
 import CustomerManagement from '../../Components/CustomerManagement/CustomerManagement'
+import AddImportReceipt from '../../Components/AddImportReceipt/AddImportReceipt'
+import PriceManagement from '../../Components/PriceManagement/PriceManagement'
+import InventoryReport from '../../Components/InventoryReport/InventoryReport'
 
 const Admin = () => {
   return (
@@ -19,6 +22,10 @@ const Admin = () => {
         <Route path='/listproduct' element={<ListProduct />} />
         <Route path='/ordermanagement' element={<OrderManagement />} />
         <Route path='/customermanagement' element={<CustomerManagement />} />
+        <Route path='/add-receipt' element={<AddImportReceipt />} />
+        <Route path='/pricemanagement' element={<PriceManagement />} />
+        <Route path='/inventoryreport' element={<InventoryReport />} />
+
         <Route path='*' element={<Dashboard />} />
       </Routes>
     </div>

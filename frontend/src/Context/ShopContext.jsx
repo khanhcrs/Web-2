@@ -35,7 +35,11 @@ const ShopContextProvider = (props) => {
       const data = await response.json();
 
       if (Array.isArray(data) && data.length > 0) {
-        const normalizedProducts = data.map((product) => {
+
+        // BƯỚC QUAN TRỌNG NHẤT: Lọc bỏ các sản phẩm có status là 'hidden'
+        const activeData = data.filter((product) => product.status !== 'hidden');
+
+        const normalizedProducts = activeData.map((product) => {
           let rawImages = []
 
           if (Array.isArray(product.images)) {

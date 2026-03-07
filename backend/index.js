@@ -1,4 +1,4 @@
-const port = 4001;
+const port = 4000;
 const express = require('express');
 const app = express();
 const { Pool } = require('pg');
@@ -33,22 +33,21 @@ const ensureSchemaAndAdminUser = async () => {
       DEFAULT 'customer'
       CHECK (role IN ('customer', 'admin'))
   `);
-
+  // 1. BẢNG USERS (Cũ)
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'customer' CHECK (role IN ('customer', 'admin'));
+  `);
   await pool.query("UPDATE users SET role = 'customer' WHERE role IS NULL");
 
-  await pool.query(`
-    ALTER TABLE products
-    ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb
-  `);
-
-  // THÊM CỘT CHO ĐƠN HÀNG
+  // 2. BẢNG ORDERS (Cũ)
   await pool.query(`
     ALTER TABLE orders 
     ADD COLUMN IF NOT EXISTS shipping_address JSONB,
     ADD COLUMN IF NOT EXISTS shipping_method VARCHAR(255),
-    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(255)
+    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(255);
   `);
-  // Thêm bảng reviews vào cơ sở dữ liệu
+
+  // 3. BẢNG REVIEWS (Cũ)
   await pool.query(`
   CREATE TABLE IF NOT EXISTS reviews (
     id SERIAL PRIMARY KEY,
@@ -60,6 +59,21 @@ const ensureSchemaAndAdminUser = async () => {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
   `);
+
+  // 4. BẢNG PRODUCTS (CŨ + THÊM CÁC CỘT MỚI TỪ A-Z THEO ĐỀ BÀI)
+  await pool.query(`
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb;
+    
+    -- Các cột mới thêm vào để tính giá và quản lý kho:
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS code VARCHAR(50) UNIQUE;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS current_import_price FLOAT DEFAULT 0;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS profit_margin FLOAT DEFAULT 0;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(50) DEFAULT 'Cái';
+  `);
+
   await pool.query(`
     UPDATE products
     SET images = CASE
@@ -71,6 +85,27 @@ const ensureSchemaAndAdminUser = async () => {
       WHEN image IS NULL AND images IS NOT NULL AND jsonb_typeof(images) = 'array' AND jsonb_array_length(images) > 0 THEN images->>0
       ELSE image
     END
+  `);
+
+  // 5. TẠO BẢNG MỚI: PHIẾU NHẬP (import_receipts)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_receipts (
+      id SERIAL PRIMARY KEY,
+      receipt_code VARCHAR(50) UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      status VARCHAR(20) DEFAULT 'pending' 
+    );
+  `);
+
+  // 6. TẠO BẢNG MỚI: CHI TIẾT PHIẾU NHẬP (import_receipt_details)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_receipt_details (
+      id SERIAL PRIMARY KEY,
+      receipt_id INTEGER REFERENCES import_receipts(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+      import_price FLOAT NOT NULL,
+      quantity INTEGER NOT NULL
+    );
   `);
 
   const adminResult = await pool.query('SELECT id, role FROM users WHERE email = $1', [DEFAULT_ADMIN_EMAIL]);
@@ -137,34 +172,42 @@ app.post('/upload', upload.single('product'), (req, res) => {
 
 app.post('/addproduct', async (req, res) => {
   try {
-    const { name, image, images = [], category, new_price, old_price } = req.body;
-    const normalizedImages = Array.isArray(images)
-      ? images.filter((img) => typeof img === 'string' && img.trim().length > 0)
-      : [];
-    const primaryImage = normalizedImages[0] || image;
-    const parsedNewPrice = Number(new_price);
-    const parsedOldPrice = Number(old_price);
+    const {
+      code, name, description, unit, category,
+      initial_stock, import_price, profit_margin, old_price, status,
+      image, images = []
+    } = req.body;
 
-    if (!name || !primaryImage || !category || Number.isNaN(parsedNewPrice) || Number.isNaN(parsedOldPrice)) {
-      return res.status(400).json({ success: false, message: 'Missing required product fields.' });
+    const normalizedImages = Array.isArray(images) ? images.filter(img => typeof img === 'string' && img.trim().length > 0) : [];
+    const primaryImage = normalizedImages[0] || image;
+
+    if (!name || !primaryImage || !category || !code) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc (Mã, Tên, Ảnh, Danh mục).' });
     }
+
+    const stock = Number(initial_stock) || 0;
+    const costPrice = Number(import_price) || 0;
+    const margin = Number(profit_margin) || 0;
+    const oldP = Number(old_price) || 0;
+
+    // TÍNH GIÁ BÁN TỰ ĐỘNG: Giá Bán = Giá Nhập * (1 + Lợi Nhuận / 100)
+    const newSellingPrice = costPrice * (1 + (margin / 100));
 
     const imagesToSave = normalizedImages.length > 0 ? normalizedImages : [primaryImage];
 
     const result = await pool.query(
-      `INSERT INTO products (name, image, images, category, new_price, old_price)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO products 
+      (code, name, description, unit, category, stock_quantity, current_import_price, profit_margin, new_price, old_price, status, image, images)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [name, primaryImage, imagesToSave, category, parsedNewPrice, parsedOldPrice]
+      [code, name, description || '', unit || 'Cái', category, stock, costPrice, margin, newSellingPrice, oldP, status || 'active', primaryImage, JSON.stringify(imagesToSave)]
     );
 
-    res.json({
-      success: true,
-      product: result.rows[0],
-    });
+    res.json({ success: true, product: result.rows[0] });
   } catch (error) {
-    console.error('Error creating product', error);
-    res.status(500).json({ success: false, message: 'Unable to create product.' });
+    console.error('Lỗi tạo sản phẩm:', error);
+    if (error.code === '23505') return res.status(400).json({ success: false, message: 'Mã sản phẩm đã tồn tại!' });
+    res.status(500).json({ success: false, message: 'Lỗi server khi tạo sản phẩm.' });
   }
 });
 
@@ -195,73 +238,48 @@ app.post('/removeproduct', async (req, res) => {
 app.put('/product/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    let { name, image, images, category, new_price, old_price, available } = req.body;
+    let { code, name, description, unit, category, profit_margin, old_price, status, images } = req.body;
+
+    // Lấy giá vốn hiện tại để tính lại giá bán nếu Admin đổi % lợi nhuận
+    const prodRes = await pool.query('SELECT current_import_price FROM products WHERE id = $1', [Number(id)]);
+    if (prodRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại.' });
+    const costPrice = prodRes.rows[0].current_import_price || 0;
 
     const fields = [];
     const values = [];
     let idx = 1;
 
-    if (name !== undefined) {
-      fields.push(`name = $${idx++}`);
-      values.push(name);
-    }
-    if (image !== undefined) {
-      fields.push(`image = $${idx++}`);
-      values.push(image);
-    }
-    if (images !== undefined) {
-      const normalizedImages = Array.isArray(images)
-        ? images.filter((img) => typeof img === 'string' && img.trim().length > 0)
-        : [];
-      fields.push(`images = $${idx++}`);
-      values.push(normalizedImages);
-      if (!image && normalizedImages.length > 0) {
-        fields.push(`image = $${idx++}`);
-        values.push(normalizedImages[0]);
-      }
-    }
-    if (category !== undefined) {
-      fields.push(`category = $${idx++}`);
-      values.push(category);
-    }
-    if (new_price !== undefined) {
-      const parsedNew = Number(new_price);
-      if (Number.isNaN(parsedNew)) {
-        return res.status(400).json({ success: false, message: 'Price must be a number.' });
-      }
-      fields.push(`new_price = $${idx++}`);
-      values.push(parsedNew);
-    }
-    if (old_price !== undefined) {
-      const parsedOld = Number(old_price);
-      if (Number.isNaN(parsedOld)) {
-        return res.status(400).json({ success: false, message: 'Price must be a number.' });
-      }
-      fields.push(`old_price = $${idx++}`);
-      values.push(parsedOld);
-    }
-    if (available !== undefined) {
-      fields.push(`available = $${idx++}`);
-      values.push(available);
+    if (code !== undefined) { fields.push(`code = $${idx++}`); values.push(code); }
+    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
+    if (unit !== undefined) { fields.push(`unit = $${idx++}`); values.push(unit); }
+    if (category !== undefined) { fields.push(`category = $${idx++}`); values.push(category); }
+    if (old_price !== undefined) { fields.push(`old_price = $${idx++}`); values.push(Number(old_price)); }
+    if (status !== undefined) { fields.push(`status = $${idx++}`); values.push(status); }
+
+    // Nếu đổi Lợi nhuận -> Tự động tính lại Giá Bán Lẻ
+    if (profit_margin !== undefined) {
+      fields.push(`profit_margin = $${idx++}`); values.push(Number(profit_margin));
+      const newPrice = costPrice * (1 + (Number(profit_margin) / 100));
+      fields.push(`new_price = $${idx++}`); values.push(newPrice);
     }
 
-    if (fields.length === 0) {
-      return res.status(400).json({ success: false, message: 'No fields to update.' });
+    // Xử lý lưu mảng hình ảnh
+    if (images !== undefined) {
+      fields.push(`images = $${idx++}`); values.push(JSON.stringify(images));
+      fields.push(`image = $${idx++}`); values.push(images.length > 0 ? images[0] : '');
     }
+
+    if (fields.length === 0) return res.status(400).json({ success: false, message: 'Không có dữ liệu cập nhật.' });
 
     values.push(Number(id));
     const query = `UPDATE products SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
 
     const result = await pool.query(query, values);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Product not found.' });
-    }
-
     res.json({ success: true, product: result.rows[0] });
   } catch (error) {
-    console.error('Error updating product', error);
-    res.status(500).json({ success: false, message: 'Unable to update product.' });
+    console.error('Lỗi cập nhật sản phẩm', error);
+    res.status(500).json({ success: false, message: 'Lỗi server.' });
   }
 });
 
@@ -800,28 +818,29 @@ app.post('/orders', async (req, res) => {
       customerId,
       customerName,
       customerEmail,
-      customerPhone, // Nhận trường SĐT
+      customerPhone,
       items = [],
       total = 0,
       status = 'pending',
-      shippingAddress, // Nhận trường Địa chỉ
+      shippingAddress,
       paymentMethod
     } = req.body;
 
     const lastOrder = await pool.query('SELECT order_id FROM orders ORDER BY order_id DESC LIMIT 1');
     const nextOrderId = lastOrder.rowCount > 0 ? lastOrder.rows[0].order_id + 1 : 1;
 
-    // Gói tất cả vào JSONB để insert vào Postgres
-    const shippingAddressObj = {
+    // Gói thông tin thành chuỗi JSON
+    const shippingAddressStr = JSON.stringify({
       name: customerName,
       email: customerEmail,
       phone: customerPhone || "Chưa cập nhật",
       address: shippingAddress
-    };
+    });
 
+    // Thêm ép kiểu ::jsonb ở biến $7
     const orderInsert = await pool.query(
       `INSERT INTO orders (order_id, customer_id, customer_name, customer_email, total, status, shipping_address, shipping_method, payment_method)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) 
        RETURNING *`,
       [
         nextOrderId,
@@ -830,7 +849,7 @@ app.post('/orders', async (req, res) => {
         customerEmail,
         total,
         status,
-        JSON.stringify(shippingAddressObj), // Lưu cứng vào DB
+        shippingAddressStr, // Truyền chuỗi đã được stringify
         "Giao hàng tiêu chuẩn",
         paymentMethod
       ]
@@ -933,6 +952,314 @@ app.get('/reviews/:productId', async (req, res) => {
     res.json({ success: true, reviews: result.rows });
   } catch (error) {
     res.status(500).json({ success: false });
+  }
+});
+
+// ================== QUẢN LÝ NHẬP HÀNG (IMPORT RECEIPTS) ==================
+
+// 1. Lấy danh sách tất cả phiếu nhập
+app.get('/import-receipts', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM import_receipts ORDER BY created_at DESC');
+    res.json({ success: true, receipts: result.rows });
+  } catch (error) {
+    console.error('Lỗi lấy danh sách phiếu nhập:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// 2. Tạo Phiếu nhập mới (Trạng thái mặc định là 'pending' - Lưu nháp)
+app.post('/import-receipts', async (req, res) => {
+  try {
+    const { receiptCode, details } = req.body;
+    // details là một mảng: [{ productId: 1, importPrice: 150000, quantity: 10 }, ...]
+
+    if (!receiptCode || !details || details.length === 0) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin phiếu nhập' });
+    }
+
+    // Insert thông tin chung của phiếu nhập
+    const receiptResult = await pool.query(
+      `INSERT INTO import_receipts (receipt_code, status) VALUES ($1, 'pending') RETURNING *`,
+      [receiptCode]
+    );
+    const receiptId = receiptResult.rows[0].id;
+
+    // Insert từng dòng chi tiết sản phẩm vào phiếu
+    for (const item of details) {
+      await pool.query(
+        `INSERT INTO import_receipt_details (receipt_id, product_id, import_price, quantity)
+         VALUES ($1, $2, $3, $4)`,
+        [receiptId, item.productId, item.importPrice, item.quantity]
+      );
+    }
+
+    res.json({ success: true, receipt: receiptResult.rows[0] });
+  } catch (error) {
+    console.error('Lỗi tạo phiếu nhập:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// 3. HOÀN THÀNH PHIẾU NHẬP (Lõi tính toán GIÁ BÌNH QUÂN)
+app.post('/import-receipts/:id/complete', async (req, res) => {
+  // Dùng Transaction để đảm bảo an toàn: Nếu lỗi giữa chừng thì hủy bỏ toàn bộ, không bị lệch data
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN'); // Bắt đầu Transaction
+    const receiptId = req.params.id;
+
+    // Kiểm tra xem phiếu có hợp lệ để hoàn thành không
+    const receiptCheck = await client.query('SELECT status FROM import_receipts WHERE id = $1', [receiptId]);
+    if (receiptCheck.rowCount === 0) throw new Error("Phiếu nhập không tồn tại");
+    if (receiptCheck.rows[0].status === 'completed') throw new Error("Phiếu này đã hoàn thành từ trước");
+
+    // Lấy toàn bộ chi tiết sản phẩm của phiếu nhập này
+    const details = await client.query('SELECT * FROM import_receipt_details WHERE receipt_id = $1', [receiptId]);
+
+    // CHẠY VÒNG LẶP TÍNH TOÁN CHO TỪNG SẢN PHẨM
+    for (const item of details.rows) {
+      // a. Lấy data hiện tại của SP trong kho
+      const prodRes = await client.query(
+        'SELECT stock_quantity, current_import_price, profit_margin FROM products WHERE id = $1',
+        [item.product_id]
+      );
+      const product = prodRes.rows[0];
+
+      const currentStock = product.stock_quantity || 0;
+      const currentImportPrice = product.current_import_price || 0;
+      const profitMargin = product.profit_margin || 0; // % lợi nhuận (VD: 20)
+
+      const importQty = item.quantity;
+      const newImportPriceInput = item.import_price;
+
+      // b. CÔNG THỨC TÍNH GIÁ NHẬP BÌNH QUÂN GIA QUYỀN (Theo đúng yêu cầu Giảng viên)
+      let weightedAveragePrice;
+      if (currentStock === 0) {
+        // Nhập lần đầu hoặc kho đã hết sạch -> Lấy thẳng giá mới
+        weightedAveragePrice = newImportPriceInput;
+      } else {
+        // Có tồn kho -> Tính trung bình cộng (Tổng giá trị cũ + Tổng giá trị mới) / (Tổng số lượng)
+        const totalOldValue = currentStock * currentImportPrice;
+        const totalNewValue = importQty * newImportPriceInput;
+        weightedAveragePrice = (totalOldValue + totalNewValue) / (currentStock + importQty);
+      }
+
+      // c. TÍNH GIÁ BÁN MỚI
+      // Công thức: Giá Bán = Giá Nhập * (100% + % Lợi nhuận)
+      const newSellingPrice = weightedAveragePrice * (1 + (profitMargin / 100));
+
+      // d. TÍNH TỔNG TỒN KHO MỚI
+      const newTotalStock = currentStock + importQty;
+
+      // e. CẬP NHẬT VÀO BẢNG SẢN PHẨM (Đồng thời đổi status thành 'active' để hiện lên web bán)
+      await client.query(
+        `UPDATE products 
+         SET stock_quantity = $1, current_import_price = $2, new_price = $3, status = 'active'
+         WHERE id = $4`,
+        [newTotalStock, weightedAveragePrice, newSellingPrice, item.product_id]
+      );
+    }
+
+    // Đổi trạng thái phiếu nhập thành 'completed'
+    await client.query("UPDATE import_receipts SET status = 'completed' WHERE id = $1", [receiptId]);
+
+    await client.query('COMMIT'); // Lưu toàn bộ thay đổi vào Database thành công
+    res.json({ success: true, message: "Hoàn thành phiếu nhập và cập nhật giá thành công!" });
+  } catch (error) {
+    await client.query('ROLLBACK'); // Hủy thao tác nếu có bất kỳ lỗi gì
+    console.error("Lỗi hoàn thành phiếu:", error);
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    client.release(); // Trả lại kết nối cho Pool
+  }
+});
+
+// 4. Lấy chi tiết 1 phiếu nhập (Dùng khi Admin bấm nút Sửa)
+app.get('/import-receipts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const receiptRes = await pool.query('SELECT * FROM import_receipts WHERE id = $1', [id]);
+    if (receiptRes.rowCount === 0) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
+
+    const detailsRes = await pool.query(`
+        SELECT ird.*, p.name, p.code 
+        FROM import_receipt_details ird
+        JOIN products p ON ird.product_id = p.id
+        WHERE ird.receipt_id = $1
+    `, [id]);
+
+    res.json({ success: true, receipt: receiptRes.rows[0], details: detailsRes.rows });
+  } catch (error) {
+    console.error('Lỗi lấy chi tiết phiếu:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// 5. CẬP NHẬT PHIẾU NHẬP (Chỉ cho phép khi phiếu còn trạng thái 'pending')
+app.put('/import-receipts/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const receiptId = req.params.id;
+    const { receiptCode, details } = req.body;
+
+    const check = await client.query('SELECT status FROM import_receipts WHERE id = $1', [receiptId]);
+    if (check.rowCount === 0) throw new Error("Phiếu không tồn tại");
+    if (check.rows[0].status === 'completed') throw new Error("Phiếu này đã hoàn thành, không thể sửa chữa!");
+
+    await client.query('UPDATE import_receipts SET receipt_code = $1 WHERE id = $2', [receiptCode, receiptId]);
+    await client.query('DELETE FROM import_receipt_details WHERE receipt_id = $1', [receiptId]);
+
+    for (const item of details) {
+      await client.query(
+        `INSERT INTO import_receipt_details (receipt_id, product_id, import_price, quantity)
+         VALUES ($1, $2, $3, $4)`,
+        [receiptId, item.productId, item.importPrice, item.quantity]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, receiptId: receiptId });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Lỗi cập nhật phiếu:', error);
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ================== QUẢN LÝ GIÁ BÁN (PROFIT MARGIN) ==================
+app.put('/update-profit-margin', async (req, res) => {
+  try {
+    const { productId, newProfitMargin } = req.body;
+
+    // 1. Lấy giá vốn (giá nhập bình quân) hiện tại
+    const prod = await pool.query('SELECT current_import_price FROM products WHERE id = $1', [productId]);
+
+    if (prod.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại' });
+    }
+
+    const costPrice = prod.rows[0].current_import_price || 0;
+
+    // 2. Tính toán Giá Bán mới: Giá Bán = Giá Vốn * (1 + %Lợi Nhuận / 100)
+    const margin = Number(newProfitMargin);
+    const newSellingPrice = costPrice * (1 + (margin / 100));
+
+    // 3. Cập nhật Tỉ lệ lợi nhuận và Giá bán mới vào Database
+    await pool.query(
+      'UPDATE products SET profit_margin = $1, new_price = $2 WHERE id = $3',
+      [margin, newSellingPrice, productId]
+    );
+
+    res.json({ success: true, newSellingPrice: newSellingPrice });
+  } catch (error) {
+    console.error('Lỗi cập nhật lợi nhuận:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ================== QUẢN LÝ TỒN KHO & THỐNG KÊ (INVENTORY REPORTS) ==================
+
+// 1. Tra cứu tồn kho tại 1 thời điểm do người dùng định
+app.get('/api/reports/stock-at-time', async (req, res) => {
+  try {
+    const { targetTime, category } = req.query;
+    if (!targetTime) return res.status(400).json({ success: false, message: 'Thiếu mốc thời gian' });
+
+    // Thuật toán: Tồn kho = Tổng Nhập (trước thời điểm T) - Tổng Xuất (trước thời điểm T)
+    let query = `
+      SELECT p.id, p.code, p.name, p.category,
+        COALESCE((
+          SELECT SUM(ird.quantity)
+          FROM import_receipt_details ird
+          JOIN import_receipts ir ON ird.receipt_id = ir.id
+          WHERE ird.product_id = p.id AND ir.status = 'completed' AND ir.created_at <= $1
+        ), 0) as total_imported,
+        COALESCE((
+          SELECT SUM(oi.quantity)
+          FROM order_items oi
+          JOIN orders o ON oi.order_id = o.id
+          WHERE oi.product_id = p.id AND o.created_at <= $1
+        ), 0) as total_sold
+      FROM products p
+      WHERE 1=1
+    `;
+    const params = [targetTime];
+
+    if (category && category !== 'all') {
+      query += ` AND p.category = $2`;
+      params.push(category);
+    }
+
+    const result = await pool.query(query, params);
+
+    // Tính số lượng tồn cuối cùng
+    const inventory = result.rows.map(item => ({
+      ...item,
+      stock_at_time: Number(item.total_imported) - Number(item.total_sold)
+    }));
+
+    res.json({ success: true, data: inventory });
+  } catch (error) {
+    console.error('Lỗi tra cứu tồn kho:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// 2. Báo cáo tổng số lượng Nhập – Xuất trong một khoảng thời gian
+app.get('/api/reports/import-export', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) return res.status(400).json({ success: false, message: 'Thiếu khoảng thời gian' });
+
+    // Lọc theo mốc thời gian >= startDate và <= endDate
+    const query = `
+      SELECT p.id, p.code, p.name,
+        COALESCE((
+          SELECT SUM(ird.quantity)
+          FROM import_receipt_details ird
+          JOIN import_receipts ir ON ird.receipt_id = ir.id
+          WHERE ird.product_id = p.id AND ir.status = 'completed' AND ir.created_at >= $1 AND ir.created_at <= $2
+        ), 0) as total_imported,
+        COALESCE((
+          SELECT SUM(oi.quantity)
+          FROM order_items oi
+          JOIN orders o ON oi.order_id = o.id
+          WHERE oi.product_id = p.id AND o.created_at >= $1 AND o.created_at <= $2
+        ), 0) as total_exported
+      FROM products p
+    `;
+    const result = await pool.query(query, [startDate, endDate]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Lỗi báo cáo xuất nhập:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// 3. Cảnh báo sản phẩm sắp hết hàng (Dựa trên số lượng do người dùng gõ vào)
+app.get('/api/reports/low-stock', async (req, res) => {
+  try {
+    const threshold = parseInt(req.query.threshold);
+    if (isNaN(threshold)) return res.status(400).json({ success: false, message: 'Ngưỡng không hợp lệ' });
+
+    const query = `
+      SELECT id, code, name, stock_quantity, current_import_price, status 
+      FROM products 
+      WHERE stock_quantity <= $1 AND status != 'hidden'
+      ORDER BY stock_quantity ASC
+    `;
+    const result = await pool.query(query, [threshold]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Lỗi cảnh báo tồn kho:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
 // ================== START SERVER ==================

@@ -8,7 +8,7 @@ import { AuthContext } from '../Context/AuthContext'
 const initialFormState = {
   name: '',
   email: '',
-  phone: '', // Thêm trường số điện thoại mới
+  phone: '',
   address: '',
   paymentMethod: 'cash_on_delivery',
   cardNumber: '',
@@ -21,12 +21,6 @@ const initialFormState = {
 const paymentMethodLabels = {
   credit_card: 'Thẻ tín dụng/Ghi nợ',
   cash_on_delivery: 'Thanh toán khi nhận hàng',
-};
-
-const paymentStatusLabels = {
-  paid: 'Đã thanh toán',
-  pending: 'Chờ thanh toán',
-  failed: 'Thanh toán thất bại',
 };
 
 const formatCurrency = (value) => {
@@ -42,14 +36,60 @@ const Checkout = () => {
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
 
+  // ==========================================
+  // LOGIC TỰ ĐỘNG ĐIỀN THÔNG TIN TỪ HỒ SƠ (ĐÃ NÂNG CẤP)
+  // ==========================================
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
+
+    // 1. Xác định key của user (giống logic bên AccountProfile)
+    const userKey = user.id || user.email || user.name;
+
+    // 2. Mặc định tên và email từ AuthContext
+    let defaultName = user.name || '';
+    let defaultPhone = '';
+    let defaultAddress = '';
+
+    // 3. Tìm trong Sổ địa chỉ (localStorage)
+    try {
+      const storedAddresses = localStorage.getItem('account_addresses');
+      if (storedAddresses) {
+        const parsed = JSON.parse(storedAddresses);
+        const userAddressList = parsed[userKey];
+
+        // Nếu user có lưu địa chỉ, lấy địa chỉ đầu tiên (ưu tiên) để tự điền
+        if (Array.isArray(userAddressList) && userAddressList.length > 0) {
+          const firstAddress = userAddressList[0];
+
+          defaultName = firstAddress.fullName || defaultName;
+          defaultPhone = firstAddress.phone || '';
+
+          // Nối các trường địa chỉ lại thành 1 chuỗi
+          const addressParts = [
+            firstAddress.street,
+            firstAddress.ward,
+            firstAddress.district,
+            firstAddress.city
+          ].filter(Boolean); // filter(Boolean) để loại bỏ các trường bị rỗng
+
+          defaultAddress = addressParts.join(', ');
+        }
+      }
+    } catch (error) {
+      console.error('Không thể đọc dữ liệu địa chỉ:', error);
+    }
+
+    // 4. Đưa dữ liệu vào Form
     setFormData((prev) => ({
       ...prev,
-      name: prev.name || user.name || '',
-      email: user.email || ''
-    }))
-  }, [user])
+      name: prev.name || defaultName,
+      email: user.email || '',
+      phone: prev.phone || defaultPhone,
+      address: prev.address || defaultAddress
+    }));
+
+  }, [user]);
+  // ==========================================
 
   const items = useMemo(() =>
     Object.entries(cartItems)
@@ -113,7 +153,7 @@ const Checkout = () => {
         customerId: user ? user.id : null,
         customerName: formData.name.trim(),
         customerEmail: formData.email.trim(),
-        customerPhone: formData.phone.trim(), // Gửi thêm SĐT lên Server
+        customerPhone: formData.phone.trim(),
         items: items.map((item) => ({
           productId: item.id,
           name: item.name,
@@ -139,7 +179,6 @@ const Checkout = () => {
         throw new Error(data.message || 'Thanh toán thất bại.');
       }
 
-      // Lưu đầy đủ thông tin vào state để hiển thị trang thành công
       setOrder({
         ...data.order,
         paymentMethod: formData.paymentMethod,
