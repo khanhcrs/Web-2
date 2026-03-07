@@ -38,7 +38,6 @@ const OrderDetail = () => {
   if (error) return <div className='order-detail'><h1>Chi tiết đơn hàng</h1><p className="error-msg">{error}</p></div>;
   if (!order) return <div className='order-detail'><h1>Chi tiết đơn hàng</h1><p>Không tìm thấy đơn hàng.</p></div>;
 
-  // XỬ LÝ DỮ LIỆU ĐỊA CHỈ: Quan trọng nhất để hết bị N/A
   const shippingInfo = typeof order.shipping_address === 'string'
     ? JSON.parse(order.shipping_address)
     : order.shipping_address;
@@ -63,12 +62,22 @@ const OrderDetail = () => {
         <div className="order-detail-section">
           <h2>Thông tin sản phẩm</h2>
           {order.items?.map(item => (
-            <div key={item.id} className="order-product-item">
-              <img src={resolveImageUrl(item.image)} alt={item.name} />
-              <div className="order-product-info">
-                <p className="product-name"><strong>{item.name}</strong></p>
-                <p>Số lượng: {item.quantity}</p>
-                <p>Giá: {Number(item.price).toLocaleString('vi-VN')} ₫</p>
+            <div key={item.id} className="order-product-item" style={{ display: 'flex', gap: '15px', marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #eee' }}>
+              <img src={resolveImageUrl(item.image)} alt={item.name} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }} />
+              <div className="order-product-info" style={{ flex: 1 }}>
+                <p className="product-name" style={{ margin: '0 0 5px 0', fontSize: '16px' }}><strong>{item.name}</strong></p>
+
+                {/* ĐÂY LÀ PHẦN BỔ SUNG: MÃ SP VÀ ĐƠN VỊ TÍNH */}
+                <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>
+                  <span>Mã SP: <strong>{item.code || 'N/A'}</strong></span>
+                  <span style={{ margin: '0 10px' }}>|</span>
+                  <span>Đơn vị: <strong>{item.unit || 'Cái'}</strong></span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <p style={{ margin: 0, color: '#475569' }}>Số lượng: <strong>{item.quantity}</strong></p>
+                  <p style={{ margin: 0, color: '#ef4444', fontWeight: 'bold', fontSize: '16px' }}>{Number(item.price).toLocaleString('vi-VN')} ₫</p>
+                </div>
               </div>
             </div>
           ))}
@@ -76,36 +85,29 @@ const OrderDetail = () => {
 
         <div className="order-detail-section">
           <h2>Thông tin thanh toán</h2>
-          <div className="payment-row"><span>Tạm tính:</span> <span>{subtotal.toLocaleString('vi-VN')} ₫</span></div>
-          <div className="payment-row"><span>Phí vận chuyển:</span> <span>{shippingFee.toLocaleString('vi-VN')} ₫</span></div>
-          <div className="payment-row total"><span>Tổng cộng:</span> <span>{totalAmount.toLocaleString('vi-VN')} ₫</span></div>
+          <div className="payment-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span>Tạm tính:</span> <span>{subtotal.toLocaleString('vi-VN')} ₫</span></div>
+          <div className="payment-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span>Phí vận chuyển:</span> <span>{shippingFee.toLocaleString('vi-VN')} ₫</span></div>
+          <div className="payment-row total" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #ccc', fontWeight: 'bold', fontSize: '18px' }}><span>Tổng cộng:</span> <span style={{ color: '#ef4444' }}>{totalAmount.toLocaleString('vi-VN')} ₫</span></div>
         </div>
 
-        {/* PHẦN ĐÃ SỬA: Gọi shippingInfo thay vì order.shipping_address */}
         <div className="order-detail-section">
           <h2>Thông tin giao hàng</h2>
-          <div className="shipping-info-grid">
+          <div className="shipping-info-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             <div className="info-group">
-              <p><strong>NGƯỜI NHẬN:</strong></p>
-              <p className="val">{shippingInfo?.name || 'Chưa cập nhật'}</p>
+              <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#64748b' }}>NGƯỜI NHẬN</p>
+              <p className="val" style={{ margin: 0, fontWeight: '500' }}>{shippingInfo?.name || 'Chưa cập nhật'}</p>
             </div>
             <div className="info-group">
-              <p><strong>ĐỊA CHỈ:</strong></p>
-              <p className="val">{shippingInfo?.address || 'Chưa cập nhật'}</p>
+              <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#64748b' }}>ĐỊA CHỈ</p>
+              <p className="val" style={{ margin: 0, fontWeight: '500' }}>{shippingInfo?.address || 'Chưa cập nhật'}</p>
             </div>
             <div className="info-group">
-              <p><strong>SỐ ĐIỆN THOẠI:</strong></p>
-              <p className="val">{shippingInfo?.phone || 'Chưa cập nhật'}</p>
+              <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#64748b' }}>SỐ ĐIỆN THOẠI</p>
+              <p className="val" style={{ margin: 0, fontWeight: '500' }}>{shippingInfo?.phone || 'Chưa cập nhật'}</p>
             </div>
             <div className="info-group">
-              <p><strong>ĐƠN VỊ VẬN CHUYỂN:</strong></p>
-              <p className="val">{order.shipping_method || 'Giao hàng tiêu chuẩn'}</p>
-            </div>
-            <div className="info-group">
-              <p><strong>THANH TOÁN:</strong></p>
-              <p className="val">
-                {order.payment_method === 'cash_on_delivery' ? 'Thanh toán khi nhận hàng' : 'Thẻ tín dụng'}
-              </p>
+              <p style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#64748b' }}>ĐƠN VỊ VẬN CHUYỂN</p>
+              <p className="val" style={{ margin: 0, fontWeight: '500' }}>{order.shipping_method || 'Giao hàng tiêu chuẩn'}</p>
             </div>
           </div>
         </div>

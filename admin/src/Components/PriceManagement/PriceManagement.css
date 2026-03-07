@@ -1,0 +1,126 @@
+.price-mgmt-container {
+    padding: 20px 30px;
+    font-family: inherit;
+    color: #1e293b;
+    box-sizing: border-box;
+    width: 100%;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.price-mgmt-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    color: #0f172a;
+}
+
+.price-mgmt-subtitle {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 25px;
+}
+
+.price-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    padding: 0;
+    overflow: hidden;
+}
+
+.price-table-wrapper {
+    overflow-x: auto;
+}
+
+.price-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.price-table th {
+    background-color: #f8fafc;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    padding: 16px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.price-table td {
+    padding: 16px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+.margin-badge {
+    background: #e0e7ff;
+    color: #4f46e5;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.edit-margin-box {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.margin-input {
+    width: 60px;
+    padding: 6px;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    outline: none;
+    text-align: center;
+    font-weight: 600;
+}
+
+.percent-icon {
+    font-weight: bold;
+    color: #475569;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-edit {
+    background: #f1f5f9;
+    color: #3b82f6;
+    border: 1px solid #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-edit:hover {
+    background: #e2e8f0;
+}
+
+.btn-save {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-cancel {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}

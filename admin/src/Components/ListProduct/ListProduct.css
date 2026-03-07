@@ -210,6 +210,177 @@
     transform: none;
 }
 
+/* Badge Trạng Thái */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-badge.active {
+    background-color: #dcfce7;
+    color: #16a34a;
+}
+
+.status-badge.hidden {
+    background-color: #fee2e2;
+    color: #ef4444;
+}
+
+.btn-edit-product {
+    background: transparent;
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+    padding: 6px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-edit-product:hover {
+    background: #3b82f6;
+    color: white;
+}
+
+/* Modal Sửa SP */
+.listproduct-edit-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.listproduct-edit-card {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.listproduct-edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.listproduct-edit-grid label {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    font-weight: bold;
+    color: #475569;
+}
+
+.listproduct-edit-grid input,
+.listproduct-edit-grid select {
+    margin-top: 5px;
+    padding: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    outline: none;
+    font-size: 14px;
+}
+
+/* Quản lý ảnh trong Form Sửa */
+.image-preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.image-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.image-wrapper.new-badge {
+    border: 2px dashed #10b981;
+}
+
+.remove-img-btn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ef4444;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.upload-more-btn {
+    width: 80px;
+    height: 80px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: #f8fafc;
+}
+
+.upload-more-btn img {
+    width: 30px;
+    opacity: 0.5;
+}
+
+/* Nút bấm Modal */
+.listproduct-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.btn-cancel-modal {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-save-modal {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
 @media (max-width: 900px) {
     .list-product {
         margin: 20px;

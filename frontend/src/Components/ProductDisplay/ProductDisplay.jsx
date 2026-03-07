@@ -11,6 +11,7 @@ import ProductReview from '../ProductReview/ProductReview'
 const ProductDisplay = (props) => {
   const { product } = props
   const { addToCart } = useContext(ShopContext)
+
   const resolvedImages = useMemo(() => {
     let imageList = []
 
@@ -56,10 +57,22 @@ const ProductDisplay = (props) => {
     return null
   }
 
+  // Khai báo biến kiểm tra Tồn kho
+  const currentStock = Number(product.stock_quantity) || 0;
+  const isOutOfStock = currentStock <= 0;
+
   const handleAddToCart = () => {
+    if (isOutOfStock) return; // Chặn thêm nếu hết hàng
+
     if (!selectedSize) {
       setSizeError('Vui lòng chọn kích thước trước khi thêm vào giỏ hàng.')
       return
+    }
+
+    // Kiểm tra không cho mua lố số lượng tồn kho
+    if (quantity > currentStock) {
+      setSizeError(`Rất tiếc, kho chỉ còn lại ${currentStock} sản phẩm.`);
+      return;
     }
 
     setSizeError('')
@@ -70,6 +83,8 @@ const ProductDisplay = (props) => {
   const handleQuantityChange = (delta) => {
     setQuantity((prev) => {
       const nextValue = Math.max(prev + delta, 1)
+      // Không cho bấm tăng quá số lượng tồn
+      if (nextValue > currentStock) return prev;
       return nextValue
     })
   }
@@ -91,7 +106,6 @@ const ProductDisplay = (props) => {
   const productImage = activeImage || resolvedImages[0] || resolveImageUrl(product?.image)
 
   return (
-    // THÊM MỘT DIV BỌC TỔNG THỂ TẠI ĐÂY
     <div className='product-page-container'>
       <div className='productdisplay'>
         <div className='productdisplay-left'>
@@ -100,11 +114,7 @@ const ProductDisplay = (props) => {
               <button
                 key={img}
                 type='button'
-                className={
-                  img === activeImage
-                    ? 'productdisplay-thumbnail active'
-                    : 'productdisplay-thumbnail'
-                }
+                className={img === activeImage ? 'productdisplay-thumbnail active' : 'productdisplay-thumbnail'}
                 onClick={() => setActiveImage(img)}
               >
                 <img src={img} alt='Hình sản phẩm' />
@@ -118,6 +128,7 @@ const ProductDisplay = (props) => {
 
         <div className='productdisplay-right'>
           <h1>{product.name}</h1>
+
           <div className='productdisplay-right-star'>
             <img src={star_icon} alt='' />
             <img src={star_icon} alt='' />
@@ -126,15 +137,40 @@ const ProductDisplay = (props) => {
             <img src={star_dull_icon} alt='' />
             <p>(122)</p>
           </div>
+
           <div className='productdisplay-right-prices'>
             <div className='productdisplay-right-price-old'>
-              {product.old_price}đ
+              {Number(product.old_price).toLocaleString()}đ
             </div>
             <div className='productdisplay-right-price-new'>
-              {product.new_price}đ
+              {Number(product.new_price).toLocaleString()}đ
             </div>
           </div>
-          <div className='productdisplay-right-description'></div>
+
+          {/* ====== CÁC THÔNG TIN CƠ BẢN VỪA BỔ SUNG ====== */}
+          <div className='productdisplay-info-specs' style={{ margin: '15px 0', fontSize: '15px', color: '#475569', lineHeight: '1.8' }}>
+            <div><strong>Mã SP:</strong> {product.code || 'Đang cập nhật'}</div>
+            <div><strong>Danh mục:</strong> <span style={{ textTransform: 'capitalize' }}>{product.category}</span></div>
+            <div><strong>Đơn vị tính:</strong> {product.unit || 'Cái'}</div>
+            <div><strong>Tình trạng: </strong>
+              {isOutOfStock ? (
+                <span style={{ color: '#ef4444', fontWeight: 'bold', background: '#fee2e2', padding: '2px 8px', borderRadius: '4px' }}>Hết hàng</span>
+              ) : (
+                <span style={{ color: '#10b981', fontWeight: 'bold' }}>Còn hàng ({currentStock} {product.unit})</span>
+              )}
+            </div>
+          </div>
+
+          {/* ====== MÔ TẢ SẢN PHẨM ====== */}
+          <div className='productdisplay-right-description' style={{ marginTop: '15px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#1e293b' }}>Mô tả chi tiết:</h4>
+            {product.description ? (
+              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{product.description}</p>
+            ) : (
+              <p style={{ margin: 0, fontStyle: 'italic', color: '#94a3b8' }}>Chưa có mô tả cho sản phẩm này.</p>
+            )}
+          </div>
+
           <div className='productdisplay-right-size'>
             <h1>Chọn kích thước</h1>
             <div className='productdisplay-right-sizes'>
@@ -142,91 +178,69 @@ const ProductDisplay = (props) => {
                 <button
                   type='button'
                   key={size}
-                  className={
-                    size === selectedSize
-                      ? 'productdisplay-size-option selected'
-                      : 'productdisplay-size-option'
-                  }
-                  onClick={() => {
-                    setSelectedSize(size)
-                    setSizeError('')
-                  }}
+                  disabled={isOutOfStock}
+                  className={size === selectedSize ? 'productdisplay-size-option selected' : 'productdisplay-size-option'}
+                  onClick={() => { setSelectedSize(size); setSizeError(''); }}
+                  style={{ opacity: isOutOfStock ? 0.5 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer' }}
                 >
                   {size}
                 </button>
               ))}
             </div>
-            {sizeError && <p className='productdisplay-size-error'>{sizeError}</p>}
+            {sizeError && <p className='productdisplay-size-error' style={{ color: 'red', marginTop: '10px' }}>{sizeError}</p>}
           </div>
+
           <div className='productdisplay-quantity'>
             <span>Số lượng</span>
             <div className='productdisplay-quantity-controls'>
-              <button
-                type='button'
-                onClick={() => handleQuantityChange(-1)}
-                aria-label='Giảm số lượng'
-              >
-                −
-              </button>
+              <button type='button' onClick={() => handleQuantityChange(-1)} disabled={isOutOfStock}>−</button>
               <span className='productdisplay-quantity-value'>{quantity}</span>
-              <button
-                type='button'
-                onClick={() => handleQuantityChange(1)}
-                aria-label='Tăng số lượng'
-              >
-                +
-              </button>
+              <button type='button' onClick={() => handleQuantityChange(1)} disabled={isOutOfStock || quantity >= currentStock}>+</button>
             </div>
           </div>
-          <button onClick={handleAddToCart}>THÊM VÀO GIỎ</button>
+
+          {/* ====== NÚT THÊM VÀO GIỎ ====== */}
+          <button
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+            style={{
+              background: isOutOfStock ? '#94a3b8' : '#ff4141',
+              cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+              opacity: isOutOfStock ? 0.7 : 1
+            }}
+          >
+            {isOutOfStock ? 'TẠM HẾT HÀNG' : 'THÊM VÀO GIỎ'}
+          </button>
         </div>
 
         {isFeedbackModalOpen && (
           <div className='productdisplay-feedback-backdrop'>
             <div className='productdisplay-feedback-modal' role='alertdialog' aria-modal='true'>
-              <button
-                type='button'
-                className='productdisplay-feedback-close'
-                onClick={handleCloseFeedbackModal}
-                aria-label='Đóng thông báo'
-              >
-                ×
-              </button>
+              <button type='button' className='productdisplay-feedback-close' onClick={handleCloseFeedbackModal}>×</button>
               <div className='productdisplay-feedback-icon'>✓</div>
               <h2>Thêm vào giỏ hàng thành công</h2>
               <div className='productdisplay-feedback-product-info'>
-                <img
-                  className='productdisplay-feedback-product-image'
-                  src={productImage}
-                  alt={product.name}
-                />
+                <img className='productdisplay-feedback-product-image' src={productImage} alt={product.name} />
                 <div className='productdisplay-feedback-product-details'>
                   <p className='productdisplay-feedback-product'>{product.name}</p>
-                  {selectedSize && (
-                    <p className='productdisplay-feedback-size'>Kích thước: {selectedSize}</p>
-                  )}
+                  {selectedSize && <p className='productdisplay-feedback-size'>Kích thước: {selectedSize}</p>}
                   <p className='productdisplay-feedback-quantity'>Số lượng: {quantity}</p>
                 </div>
               </div>
               <div className='productdisplay-feedback-actions'>
-                <button type='button' className='continue' onClick={handleContinueShopping}>
-                  Tiếp tục mua sắm
-                </button>
-                <button type='button' className='view-cart' onClick={handleViewCart}>
-                  Xem giỏ hàng
-                </button>
+                <button type='button' className='continue' onClick={handleContinueShopping}>Tiếp tục mua sắm</button>
+                <button type='button' className='view-cart' onClick={handleViewCart}>Xem giỏ hàng</button>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* 2. CHÈN COMPONENT ĐÁNH GIÁ Ở ĐÂY, NGAY BÊN DƯỚI PHẦN CHI TIẾT SẢN PHẨM */}
       <div className="product-review-wrapper" style={{ marginTop: '50px', padding: '0 20px' }}>
         <ProductReview productId={product.id} />
       </div>
 
-    </div> // ĐÓNG THẺ BỌC TỔNG THỂ
+    </div>
   )
 }
 
