@@ -1,253 +1,166 @@
-# Web-2 (Clothify) – Hướng dẫn setup & chạy dự án đầy đủ
+# Clothify PHP Runtime
 
-Đây là monorepo gồm **3 ứng dụng chạy cùng nhau**:
+Repo này đã được chuyển sang mô hình runtime mới:
 
-- `backend/`: API server dùng **Node.js + Express + PostgreSQL**.
-- `frontend/`: website khách hàng (React + CRA).
-- `admin/`: trang quản trị (React + Vite).
+- `backend-php/`: backend PHP chạy ở `http://127.0.0.1:8000`
+- `frontend/build/`: storefront bundle tĩnh được PHP serve ở `http://127.0.0.1:3000`
+- `admin/dist/`: admin bundle tĩnh được PHP serve ở `http://127.0.0.1:5173`
+- `legacy/backend-nodejs-archive/`: backend Node.js cũ để rollback khi cần
 
----
+## Chạy hằng ngày
 
-## 1) Yêu cầu môi trường
+Chỉ cần PHP 8.2+ và PostgreSQL đang chạy.
 
-Cài sẵn các công cụ sau:
-
-- **Node.js**: khuyến nghị `v18` hoặc `v20`.
-- **npm**: đi kèm Node.js.
-- **PostgreSQL**: khuyến nghị `v14+`.
-- (Tuỳ chọn) `psql` hoặc PgAdmin để import schema.
-
-Kiểm tra nhanh:
-
-```bash
-node -v
-npm -v
-psql --version
+```bat
+.\start-clothify.bat
 ```
 
----
+Dừng toàn bộ:
 
-## 2) Clone source code
-
-```bash
-git clone <REPO_URL>
-cd Web-2
+```bat
+.\stop-clothify.bat
 ```
 
-> Nếu bạn đã có source, chỉ cần vào đúng thư mục dự án rồi pull code mới nhất.
+Launcher sẽ:
 
----
+- chạy 3 PHP server nền
+- lưu PID vào `%TEMP%\clothify-runtime\clothify-pids.txt`
+- ghi log vào `%TEMP%\clothify-runtime\logs`
 
-## 3) Cài dependencies cho từng app
+## Cổng mặc định
 
-Chạy từ thư mục gốc `Web-2`:
+- Frontend: `http://127.0.0.1:3000`
+- Admin: `http://127.0.0.1:5173`
+- Backend API: `http://127.0.0.1:8000`
 
-```bash
-npm install --prefix backend
-npm install --prefix frontend
-npm install --prefix admin
-```
-
----
-
-## 4) Chuẩn bị PostgreSQL database
-
-### 4.1 Tạo database
-
-Mặc định backend đang kết nối DB:
-
-- host: `localhost`
-- port: `5432`
-- user: `postgres`
-- password: `123123`
-- database: `clothify`
-
-Bạn có thể tạo DB bằng lệnh:
-
-```bash
-createdb -U postgres clothify
-```
-
-Hoặc trong `psql`:
-
-```sql
-CREATE DATABASE clothify;
-```
-
-### 4.2 Import schema
-
-File schema có sẵn tại: `backend/db.sql`.
-
-```bash
-psql -U postgres -d clothify -f backend/db.sql
-```
-
-Schema này tạo các bảng:
-
-- `users`
-- `products`
-- `orders`
-- `order_items`
-
-### 4.3 Lưu ý tài khoản admin mặc định
-
-Khi backend chạy lần đầu, hệ thống sẽ tự seed tài khoản admin nếu chưa có:
-
-- Email: `admin@clothify.com`
-- Password: `Admin@123`
-
-Ngoài ra có thể override bằng biến môi trường:
-
-- `ADMIN_EMAIL`
-- `ADMIN_NAME`
-- `ADMIN_PASSWORD`
-
----
-
-## 5) Cấu hình môi trường (khuyến nghị)
-
-Hiện tại backend dùng cấu hình PostgreSQL hard-code trong `backend/index.js`.
-Nếu máy bạn dùng thông tin DB khác, sửa trực tiếp đoạn `new Pool({...})` trong file này.
-
-Về API URL:
-
-- Frontend mặc định gọi API tại `http://localhost:4000`.
-- Admin mặc định gọi API tại `http://localhost:4000`.
-
-Bạn có thể đổi bằng biến môi trường:
-
-### Frontend (`frontend/.env`)
-
-```env
-REACT_APP_API_BASE_URL=http://localhost:4000
-REACT_APP_ADMIN_PORTAL_URL=http://localhost:5173
-```
-
-### Admin (`admin/.env`)
-
-```env
-VITE_API_BASE_URL=http://localhost:4000
-```
-
----
-
-## 6) Chạy dự án ở chế độ development
-
-### Cách A: chạy từng service (khuyên dùng khi debug)
-
-Mở **3 terminal** tại thư mục gốc dự án.
-
-**Terminal 1 – Backend**
-
-```bash
-npm start --prefix backend
-```
-
-Backend chạy ở: `http://localhost:4000`
-
-**Terminal 2 – Admin**
-
-```bash
-npm run dev --prefix admin
-```
-
-Admin thường chạy ở: `http://localhost:5173`
-
-**Terminal 3 – Frontend**
-
-```bash
-npm start --prefix frontend
-```
-
-Frontend thường chạy ở: `http://localhost:3000`
-
----
-
-### Cách B: chạy tất cả bằng 1 lệnh
-
-Dự án có script tiện ích:
-
-```bash
-./scripts/dev-all.sh
-```
-
-Script sẽ tự khởi chạy backend + admin + frontend và dừng toàn bộ khi nhấn `Ctrl + C`.
-
----
-
-## 7) Kiểm tra nhanh sau khi chạy
-
-1. Mở `http://localhost:3000` (storefront).
-2. Mở `http://localhost:5173` (admin).
-3. Gọi thử API:
-
-```bash
-curl http://localhost:4000/
-```
-
-Nếu OK sẽ trả về:
+Admin hiện có màn hình đăng nhập riêng tại:
 
 ```text
-Express App is running with PostgreSQL
+http://127.0.0.1:5173/login
 ```
 
----
+Nếu đăng nhập admin từ storefront, frontend sẽ tự chuyển sang admin login kèm session để auto sign-in.
 
-## 8) Build production
+## Database
 
-```bash
-npm run build --prefix frontend
-npm run build --prefix admin
+Backend PHP đọc cấu hình PostgreSQL từ biến môi trường hoặc `backend-php/.env`.
+
+Mẫu cấu hình:
+
+```env
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=clothify
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=123123
+
+JWT_SECRET=secret_ecom
+
+ADMIN_EMAIL=admin@clothify.com
+ADMIN_NAME=Clothify Admin
+ADMIN_PASSWORD=Admin@123
 ```
 
-Backend là Node server nên deploy bằng cách chạy:
+Nếu chưa có file `.env`, backend sẽ dùng fallback mặc định giống `.env.example`.
 
-```bash
+Schema chuẩn nằm ở:
+
+```text
+backend-php/database/schema.sql
+```
+
+Backend cũng tự bootstrap và align schema khi khởi động.
+
+## Runtime mới hoạt động thế nào
+
+- Backend PHP đã giữ các route tương thích với backend Node cũ như:
+  - `/`
+  - `/upload`
+  - `/addproduct`
+  - `/removeproduct`
+  - `/product/:id`
+  - `/allproducts`
+  - `/register`
+  - `/login`
+  - `/users`
+  - `/users/:userId/status`
+  - `/users/:userId/role`
+  - `/addtocart`
+  - `/removefromcart`
+  - `/my-orders`
+  - `/order/:orderId`
+  - `/orders`
+  - `/addreview`
+  - `/reviews/:productId`
+  - `/import-receipts`
+  - `/import-receipts/:id`
+  - `/import-receipts/:id/complete`
+  - `/update-profit-margin`
+  - `/api/reports/stock-at-time`
+  - `/api/reports/import-export`
+  - `/api/reports/low-stock`
+- Ảnh upload cũ đã được migrate sang `backend-php/storage/upload/images`
+- Frontend/Admin đã chuyển sang gọi API cổng `8000`
+- Các API quản trị quan trọng đã yêu cầu `Bearer` token admin
+
+## Rollback về backend Node.js
+
+Archive backend cũ nằm tại:
+
+```text
+legacy/backend-nodejs-archive
+```
+
+Khôi phục lại thư mục `backend/` từ archive:
+
+```bat
+.\rollback-clothify-backend.bat
+```
+
+Sau đó có thể chạy legacy backend lại bằng:
+
+```bat
 npm start --prefix backend
 ```
 
-> Khi deploy thật, nhớ cấu hình domain, HTTPS, reverse proxy (Nginx), và thông tin DB phù hợp môi trường production.
+Lưu ý:
 
----
+- rollback script chỉ khôi phục lại thư mục backend Node.js cũ
+- frontend/admin hiện tại đang mặc định trỏ tới API PHP cổng `8000`
+- nếu rollback hoàn toàn sang Node runtime, cần đổi lại API base URL hoặc chạy reverse proxy tương ứng
 
-## 9) Các lỗi thường gặp & cách xử lý
+## Rebuild bundle nếu sau này sửa frontend/admin
 
-### Lỗi kết nối PostgreSQL
+Runtime hằng ngày không cần Node.js, nhưng nếu bạn sửa source ở `frontend/src` hoặc `admin/src` thì cần build lại bundle một lần:
 
-- Kiểm tra PostgreSQL đã chạy chưa.
-- Kiểm tra đúng user/password/database trong `backend/index.js`.
-- Kiểm tra đã import `backend/db.sql` chưa.
+```bat
+cd frontend
+npm install
+npm run build
 
-### Port bị trùng
-
-- `3000`, `4000`, `5173` đang bị app khác dùng.
-- Tắt app đang chiếm port hoặc đổi port cấu hình.
-
-### Frontend/Admin không load được ảnh
-
-- Kiểm tra backend đang chạy.
-- Kiểm tra URL API trong `frontend/src/config.js` và `admin/src/config.js`.
-- Kiểm tra đường dẫn ảnh trả về từ backend có prefix `/images/...`.
-
-### Login admin nhưng không vào trang quản trị
-
-- Xác nhận đăng nhập bằng tài khoản có role `admin`.
-- Kiểm tra admin app (`5173`) đang chạy.
-
----
-
-## 10) Gợi ý quy trình setup nhanh cho máy mới
-
-```bash
-# 1) Cài dependencies
-npm install --prefix backend && npm install --prefix frontend && npm install --prefix admin
-
-# 2) Tạo DB + import schema
-createdb -U postgres clothify
-psql -U postgres -d clothify -f backend/db.sql
-
-# 3) Chạy cả 3 service
-./scripts/dev-all.sh
+cd ..\admin
+npm install
+npm run build
 ```
 
-Chúc bạn setup thành công 🚀
+Sau khi build xong, vẫn chạy ứng dụng bằng:
+
+```bat
+.\start-clothify.bat
+```
+
+## Smoke test nhanh
+
+Sau khi start, kiểm tra:
+
+- `http://127.0.0.1:8000/`
+- `http://127.0.0.1:3000/`
+- `http://127.0.0.1:3000/cart`
+- `http://127.0.0.1:5173/`
+- `http://127.0.0.1:5173/addproduct`
+
+## Ghi chú
+
+- `frontend/build/` và `admin/dist/` là bundle runtime hiện tại
+- `legacy/backend-nodejs-archive/` giữ nguyên backend Node.js cũ để khôi phục khi cần
+- không cần Node.js để chạy app hằng ngày nữa

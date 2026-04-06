@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './PriceManagement.css';
+import { API_BASE_URL } from '../../config';
+import { adminFetch } from '../../lib/adminApi';
 
 const PriceManagement = () => {
     const [products, setProducts] = useState([]);
@@ -8,7 +10,7 @@ const PriceManagement = () => {
 
     const fetchProducts = async () => {
         try {
-            const res = await fetch('http://localhost:4000/allproducts');
+            const res = await adminFetch(`${API_BASE_URL}/allproducts`);
             const data = await res.json();
             setProducts(data);
         } catch (error) {
@@ -35,7 +37,7 @@ const PriceManagement = () => {
     // Gửi API lưu Tỉ lệ lợi nhuận mới
     const handleSaveMargin = async (productId) => {
         try {
-            const res = await fetch('http://localhost:4000/update-profit-margin', {
+            const res = await adminFetch(`${API_BASE_URL}/update-profit-margin`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productId: productId, newProfitMargin: tempMargin })

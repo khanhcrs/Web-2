@@ -5,7 +5,16 @@ const normalizeBaseUrl = (url) => {
   return url.endsWith('/') ? url.slice(0, -1) : url
 }
 
-const DEFAULT_API_BASE_URL = 'http://localhost:4000'
+const getDefaultApiBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    return 'http://127.0.0.1:8000'
+  }
+
+  const { protocol, hostname } = window.location
+  return `${protocol}//${hostname}:8000`
+}
+
+const DEFAULT_API_BASE_URL = getDefaultApiBaseUrl()
 
 export const API_BASE_URL = normalizeBaseUrl(
   process.env.REACT_APP_API_BASE_URL || DEFAULT_API_BASE_URL

@@ -60,7 +60,11 @@ const LoginSignup = () => {
       } else if (data.token && data.user) {
         authenticate(data.token, data.user)
         if (data.user.role === 'admin') {
-          window.location.href = ADMIN_PORTAL_URL || '/admin'
+          const adminUrl = new URL(ADMIN_PORTAL_URL || '/admin', window.location.origin)
+          adminUrl.pathname = `${adminUrl.pathname.replace(/\/$/, '')}/login`
+          adminUrl.searchParams.set('token', data.token)
+          adminUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(data.user)))
+          window.location.href = adminUrl.toString()
         } else {
           navigate('/', { replace: true })
         }

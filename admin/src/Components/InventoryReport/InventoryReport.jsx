@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './InventoryReport.css';
+import { API_BASE_URL } from '../../config';
+import { adminFetch } from '../../lib/adminApi';
 
 const InventoryReport = () => {
     // State quản lý Tab đang active (1, 2, hoặc 3)
@@ -24,7 +26,7 @@ const InventoryReport = () => {
     const fetchStockAtTime = async () => {
         if (!targetTime) return alert('Vui lòng chọn mốc thời gian!');
         try {
-            const res = await fetch(`http://localhost:4000/api/reports/stock-at-time?targetTime=${targetTime}&category=${category}`);
+            const res = await adminFetch(`${API_BASE_URL}/api/reports/stock-at-time?targetTime=${targetTime}&category=${category}`);
             const data = await res.json();
             if (data.success) setStockData(data.data);
             else alert(data.message);
@@ -38,7 +40,7 @@ const InventoryReport = () => {
         if (!startDate || !endDate) return alert('Vui lòng chọn đầy đủ Từ ngày và Đến ngày!');
         if (new Date(startDate) > new Date(endDate)) return alert('Ngày bắt đầu không được lớn hơn ngày kết thúc!');
         try {
-            const res = await fetch(`http://localhost:4000/api/reports/import-export?startDate=${startDate}&endDate=${endDate}`);
+            const res = await adminFetch(`${API_BASE_URL}/api/reports/import-export?startDate=${startDate}&endDate=${endDate}`);
             const data = await res.json();
             if (data.success) setIoData(data.data);
             else alert(data.message);
@@ -51,7 +53,7 @@ const InventoryReport = () => {
     const fetchLowStock = async () => {
         if (threshold === '' || threshold < 0) return alert('Ngưỡng số lượng không hợp lệ!');
         try {
-            const res = await fetch(`http://localhost:4000/api/reports/low-stock?threshold=${threshold}`);
+            const res = await adminFetch(`${API_BASE_URL}/api/reports/low-stock?threshold=${threshold}`);
             const data = await res.json();
             if (data.success) setLowStockData(data.data);
             else alert(data.message);

@@ -1,0 +1,231 @@
+{
+  "created_at": "2026-04-06T11:07:57+00:00",
+  "reason": "broken-image-products-removal",
+  "product_ids": [
+    4,
+    5,
+    6
+  ],
+  "products": [
+    {
+      "id": 4,
+      "name": "Áo phao ",
+      "image": "/images/product_1772782962831.jpg",
+      "images": "[\"/images/product_1772782962831.jpg\"]",
+      "category": "women",
+      "new_price": "330.00",
+      "old_price": "360.00",
+      "available": true,
+      "date": "2026-03-06 14:42:42.935036",
+      "updated_at": "2026-03-09 15:17:17.498708",
+      "sku": null,
+      "profit_margin_percent": "0.00",
+      "avg_cost": "2800.00",
+      "stock_qty": 4,
+      "code": null,
+      "description": null,
+      "unit": "Cái",
+      "status": "active",
+      "stock_quantity": 0,
+      "current_import_price": "0",
+      "profit_margin": "0"
+    },
+    {
+      "id": 5,
+      "name": "Áo khoác LV ",
+      "image": "/images/product_1772783195209.jpg",
+      "images": "[\"/images/product_1772783195209.jpg\"]",
+      "category": "women",
+      "new_price": "1000.00",
+      "old_price": "1200.00",
+      "available": true,
+      "date": "2026-03-06 14:46:35.275004",
+      "updated_at": "2026-03-09 15:10:47.323852",
+      "sku": null,
+      "profit_margin_percent": "0.00",
+      "avg_cost": "2800.00",
+      "stock_qty": 4,
+      "code": null,
+      "description": null,
+      "unit": "Cái",
+      "status": "active",
+      "stock_quantity": 0,
+      "current_import_price": "0",
+      "profit_margin": "0"
+    },
+    {
+      "id": 6,
+      "name": "Áo khoác",
+      "image": "/images/product_1772783223005.jpg",
+      "images": "[\"/images/product_1772783223005.jpg\"]",
+      "category": "men",
+      "new_price": "0.00",
+      "old_price": "2000.00",
+      "available": true,
+      "date": "2026-03-06 14:47:03.178705",
+      "updated_at": "2026-03-09 15:10:05.467023",
+      "sku": null,
+      "profit_margin_percent": "0.00",
+      "avg_cost": "1700.00",
+      "stock_qty": 6,
+      "code": null,
+      "description": null,
+      "unit": "Cái",
+      "status": "active",
+      "stock_quantity": 0,
+      "current_import_price": "0",
+      "profit_margin": "40"
+    }
+  ],
+  "order_items": [
+    {
+      "id": 1,
+      "order_id": 2,
+      "product_id": 5,
+      "name": "Áo khoác LV",
+      "quantity": 2,
+      "price": "1000.00",
+      "created_at": "2026-04-05 02:01:52.651053",
+      "size": null,
+      "image": null,
+      "code": null,
+      "unit": null
+    }
+  ],
+  "purchase_receipt_items": [
+    {
+      "id": 1,
+      "receipt_id": 2,
+      "product_id": 4,
+      "qty": 3,
+      "unit_cost": "2800.00",
+      "created_at": "2026-03-09 13:11:34.414785"
+    },
+    {
+      "id": 2,
+      "receipt_id": 4,
+      "product_id": 6,
+      "qty": 6,
+      "unit_cost": "1700.00",
+      "created_at": "2026-03-09 15:10:00.563214"
+    },
+    {
+      "id": 3,
+      "receipt_id": 5,
+      "product_id": 5,
+      "qty": 4,
+      "unit_cost": "2800.00",
+      "created_at": "2026-03-09 15:10:43.351652"
+    },
+    {
+      "id": 4,
+      "receipt_id": 6,
+      "product_id": 4,
+      "qty": 1,
+      "unit_cost": "2800.00",
+      "created_at": "2026-03-09 15:11:05.909458"
+    },
+    {
+      "id": 5,
+      "receipt_id": 7,
+      "product_id": 6,
+      "qty": 1,
+      "unit_cost": "1000.00",
+      "created_at": "2026-04-03 00:22:29.31742"
+    }
+  ],
+  "inventory_lots": [
+    {
+      "id": 1,
+      "lot_code": "LOT-PR-20260309-011-4",
+      "product_id": 4,
+      "receipt_id": 2,
+      "receipt_item_id": 1,
+      "received_date": "2026-03-09 00:00:00",
+      "unit_cost": "2800.00",
+      "qty_received": 3,
+      "qty_remaining": 3
+    },
+    {
+      "id": 2,
+      "lot_code": "LOT-PR-20260309-004-6",
+      "product_id": 6,
+      "receipt_id": 4,
+      "receipt_item_id": 2,
+      "received_date": "2026-03-09 00:00:00",
+      "unit_cost": "1700.00",
+      "qty_received": 6,
+      "qty_remaining": 6
+    },
+    {
+      "id": 3,
+      "lot_code": "LOT-PR-20260309-005-5",
+      "product_id": 5,
+      "receipt_id": 5,
+      "receipt_item_id": 3,
+      "received_date": "2026-03-09 00:00:00",
+      "unit_cost": "2800.00",
+      "qty_received": 4,
+      "qty_remaining": 4
+    },
+    {
+      "id": 4,
+      "lot_code": "LOT-PR-20260309-006-4",
+      "product_id": 4,
+      "receipt_id": 6,
+      "receipt_item_id": 4,
+      "received_date": "2026-03-01 00:00:00",
+      "unit_cost": "2800.00",
+      "qty_received": 1,
+      "qty_remaining": 1
+    }
+  ],
+  "inventory_transactions": [
+    {
+      "id": 1,
+      "tx_time": "2026-03-09 13:11:47.323559",
+      "ref_type": "PURCHASE_RECEIPT",
+      "ref_id": 2,
+      "product_id": 4,
+      "qty_in": 3,
+      "qty_out": 0,
+      "unit_cost": "2800.00",
+      "note": null
+    },
+    {
+      "id": 2,
+      "tx_time": "2026-03-09 15:10:05.467023",
+      "ref_type": "PURCHASE_RECEIPT",
+      "ref_id": 4,
+      "product_id": 6,
+      "qty_in": 6,
+      "qty_out": 0,
+      "unit_cost": "1700.00",
+      "note": null
+    },
+    {
+      "id": 3,
+      "tx_time": "2026-03-09 15:10:47.323852",
+      "ref_type": "PURCHASE_RECEIPT",
+      "ref_id": 5,
+      "product_id": 5,
+      "qty_in": 4,
+      "qty_out": 0,
+      "unit_cost": "2800.00",
+      "note": null
+    },
+    {
+      "id": 4,
+      "tx_time": "2026-03-09 15:17:17.498708",
+      "ref_type": "PURCHASE_RECEIPT",
+      "ref_id": 6,
+      "product_id": 4,
+      "qty_in": 1,
+      "qty_out": 0,
+      "unit_cost": "2800.00",
+      "note": null
+    }
+  ],
+  "reviews": [],
+  "import_receipt_details": []
+}

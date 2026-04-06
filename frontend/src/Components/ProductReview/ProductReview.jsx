@@ -35,7 +35,7 @@ const ProductReview = ({ productId }) => {
         e.preventDefault();
 
         // Xác nhận token
-        const finalToken = contextToken || localStorage.getItem('auth-token');
+        const finalToken = contextToken || localStorage.getItem('auth_token') || localStorage.getItem('auth-token');
 
         if (!finalToken) {
             setError('Vui lòng đăng nhập để đánh giá sản phẩm.');

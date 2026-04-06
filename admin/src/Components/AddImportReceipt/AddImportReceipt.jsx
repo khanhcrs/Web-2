@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AddImportReceipt.css';
+import { API_BASE_URL } from '../../config';
+import { adminFetch } from '../../lib/adminApi';
 
 const AddImportReceipt = () => {
     // 1. STATE CHO TÌM KIẾM VÀ DANH SÁCH
@@ -24,12 +26,12 @@ const AddImportReceipt = () => {
     }, []);
 
     const fetchProducts = async () => {
-        const res = await fetch('http://localhost:4000/allproducts');
+        const res = await adminFetch(`${API_BASE_URL}/allproducts`);
         setProducts(await res.json());
     };
 
     const fetchAllReceipts = async () => {
-        const res = await fetch('http://localhost:4000/import-receipts');
+        const res = await adminFetch(`${API_BASE_URL}/import-receipts`);
         const data = await res.json();
         if (data.success) setReceiptsList(data.receipts);
     };
@@ -42,7 +44,7 @@ const AddImportReceipt = () => {
     // --- CHỨC NĂNG: BẤM NÚT "SỬA PHIẾU" ---
     const handleEditReceipt = async (id) => {
         try {
-            const res = await fetch(`http://localhost:4000/import-receipts/${id}`);
+            const res = await adminFetch(`${API_BASE_URL}/import-receipts/${id}`);
             const data = await res.json();
 
             if (data.success) {
@@ -109,7 +111,7 @@ const AddImportReceipt = () => {
             // BƯỚC 1: LƯU THÔNG TIN PHIẾU (TẠO MỚI HOẶC CẬP NHẬT)
             if (editingReceiptId) {
                 // Nếu đang Sửa -> Gọi API Cập nhật (PUT)
-                const res = await fetch(`http://localhost:4000/import-receipts/${editingReceiptId}`, {
+                const res = await adminFetch(`${API_BASE_URL}/import-receipts/${editingReceiptId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ receiptCode, details })
@@ -118,7 +120,7 @@ const AddImportReceipt = () => {
                 if (!data.success) return alert(data.message);
             } else {
                 // Nếu Tạo mới -> Gọi API Tạo (POST)
-                const res = await fetch('http://localhost:4000/import-receipts', {
+                const res = await adminFetch(`${API_BASE_URL}/import-receipts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ receiptCode, details })
@@ -130,7 +132,7 @@ const AddImportReceipt = () => {
 
             // BƯỚC 2: NẾU BẤM "HOÀN THÀNH", GỌI API CHỐT KHO & TÍNH GIÁ
             if (isComplete) {
-                const completeRes = await fetch(`http://localhost:4000/import-receipts/${currentReceiptId}/complete`, {
+                const completeRes = await adminFetch(`${API_BASE_URL}/import-receipts/${currentReceiptId}/complete`, {
                     method: 'POST'
                 });
                 const completeData = await completeRes.json();

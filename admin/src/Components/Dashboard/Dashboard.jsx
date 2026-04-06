@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import './Dashboard.css'
 import { API_BASE_URL } from '../../config'
+import { adminFetch } from '../../lib/adminApi'
 
 const formatCurrency = (amount) => {
   const numeric = typeof amount === 'number' ? amount : Number(amount) || 0
@@ -30,8 +31,8 @@ const Dashboard = () => {
       setError('')
       try {
         const [ordersResp, usersResp] = await Promise.all([
-          fetch(`${API_BASE_URL}/orders`),
-          fetch(`${API_BASE_URL}/users`)
+          adminFetch(`${API_BASE_URL}/orders`),
+          adminFetch(`${API_BASE_URL}/users`)
         ])
 
         const ordersData = await ordersResp.json()

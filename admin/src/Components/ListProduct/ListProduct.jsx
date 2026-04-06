@@ -1,261 +1,383 @@
-import React, { useEffect, useState } from 'react';
-import './ListProduct.css';
-import cross_icon from '../../assets/cross_icon.png';
-import upload_area from '../../assets/upload_area.svg';
-import { API_BASE_URL, resolveImageUrl } from '../../config';
+import React, { useEffect, useState } from 'react'
+import './ListProduct.css'
+import cross_icon from '../../assets/cross_icon.png'
+import upload_area from '../../assets/upload_area.svg'
+import { API_BASE_URL, resolveImageUrl } from '../../config'
+import { adminFetch } from '../../lib/adminApi'
+
+const normalizeProductImages = (value, fallbackImage = '') => {
+  let images = []
+
+  if (Array.isArray(value)) {
+    images = value
+  } else if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value)
+      images = Array.isArray(parsed) ? parsed : [value]
+    } catch (error) {
+      images = [value]
+    }
+  }
+
+  const normalized = images
+    .filter((image) => typeof image === 'string')
+    .map((image) => image.trim())
+    .filter(Boolean)
+
+  if (normalized.length === 0 && fallbackImage) {
+    return [fallbackImage]
+  }
+
+  return normalized
+}
+
+const normalizeProduct = (product) => ({
+  ...product,
+  images: normalizeProductImages(product.images, product.image)
+})
 
 const ListProduct = () => {
-  const [allProducts, setAllProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  // STATE CHO CHỈNH SỬA
-  const [editProduct, setEditProduct] = useState(null);
-  const [existingImages, setExistingImages] = useState([]); // Ảnh cũ từ DB
-  const [newImages, setNewImages] = useState([]); // Ảnh mới up lên
-  const [saving, setSaving] = useState(false);
+  const [allProducts, setAllProducts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [editProduct, setEditProduct] = useState(null)
+  const [existingImages, setExistingImages] = useState([])
+  const [newImages, setNewImages] = useState([])
+  const [saving, setSaving] = useState(false)
 
   const fetchInfo = async () => {
-    setLoading(true);
+    setLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/allproducts`);
-      const data = await response.json();
-      setAllProducts(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
+      const response = await adminFetch(`${API_BASE_URL}/allproducts`)
+      const data = await response.json()
+      setAllProducts(Array.isArray(data) ? data.map(normalizeProduct) : [])
+    } catch (error) {
+      console.error(error)
+      setAllProducts([])
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  useEffect(() => { fetchInfo(); }, []);
+  useEffect(() => {
+    fetchInfo()
+  }, [])
 
   const removeProduct = async (id) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) return;
+    if (!window.confirm('Ban co chac chan muon xoa san pham nay?')) {
+      return
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/removeproduct`, {
+      const response = await adminFetch(`${API_BASE_URL}/removeproduct`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert(data.action === 'hidden' ? "Sản phẩm đã từng nhập kho nên được chuyển sang trạng thái ẨN." : "Đã xóa vĩnh viễn sản phẩm.");
-        fetchInfo();
-      } else {
-        alert(data.message);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+      })
+      const data = await response.json()
 
-  // --- MỞ FORM SỬA ---
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Khong the xoa san pham.')
+      }
+
+      alert(
+        data.action === 'hidden'
+          ? 'San pham da co lich su nen duoc chuyen sang trang thai an.'
+          : 'Da xoa vinh vien san pham.'
+      )
+      fetchInfo()
+    } catch (error) {
+      alert(error.message || 'Khong the xoa san pham.')
+    }
+  }
+
   const startEdit = (product) => {
-    setEditProduct({ ...product });
-    // Lấy mảng ảnh cũ (nếu mảng rỗng thì lấy ảnh chính)
-    let imgs = product.images || [];
-    if (imgs.length === 0 && product.image) imgs = [product.image];
-    setExistingImages(imgs);
-    setNewImages([]);
-  };
+    const normalizedProduct = normalizeProduct(product)
+    setEditProduct(normalizedProduct)
+    setExistingImages(normalizedProduct.images)
+    setNewImages([])
+  }
 
   const updateEditField = (field, value) => {
-    setEditProduct((prev) => (prev ? { ...prev, [field]: value } : prev));
-  };
+    setEditProduct((prev) => (prev ? { ...prev, [field]: value } : prev))
+  }
 
-  // --- XỬ LÝ HÌNH ẢNH TRONG FORM SỬA ---
-  const handleNewImageUpload = (e) => {
-    const files = Array.from(e.target.files || []);
-    setNewImages([...newImages, ...files]);
-  };
+  const handleNewImageUpload = (event) => {
+    const files = Array.from(event.target.files || [])
+    setNewImages((prev) => [...prev, ...files])
+  }
 
   const removeExistingImage = (index) => {
-    setExistingImages(existingImages.filter((_, i) => i !== index));
-  };
+    setExistingImages((prev) => prev.filter((_, currentIndex) => currentIndex !== index))
+  }
 
   const removeNewImage = (index) => {
-    setNewImages(newImages.filter((_, i) => i !== index));
-  };
+    setNewImages((prev) => prev.filter((_, currentIndex) => currentIndex !== index))
+  }
 
-  // --- LƯU CẬP NHẬT ---
   const submitUpdate = async () => {
-    if (!editProduct) return;
-    setSaving(true);
-    try {
-      let finalImages = [...existingImages];
+    if (!editProduct) {
+      return
+    }
 
-      // 1. Nếu có ảnh mới, phải upload lên server trước
+    setSaving(true)
+
+    try {
+      let finalImages = [...existingImages]
+
       for (const file of newImages) {
-        const formData = new FormData();
-        formData.append('product', file);
-        const uploadResp = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', body: formData });
-        const uploadData = await uploadResp.json();
-        if (uploadData.success) {
-          finalImages.push(uploadData.image_url);
+        const formData = new FormData()
+        formData.append('product', file)
+
+        const uploadResponse = await adminFetch(`${API_BASE_URL}/upload`, {
+          method: 'POST',
+          body: formData
+        })
+        const uploadData = await uploadResponse.json()
+
+        if (!uploadResponse.ok || !uploadData.success) {
+          throw new Error(uploadData.message || 'Khong the upload hinh anh.')
         }
+
+        finalImages.push(uploadData.image_url)
       }
+
+      finalImages = Array.from(new Set(finalImages.filter(Boolean)))
 
       if (finalImages.length === 0) {
-        alert("Sản phẩm phải có ít nhất 1 hình ảnh!");
-        setSaving(false); return;
+        throw new Error('San pham phai co it nhat 1 hinh anh.')
       }
 
-      // 2. Gửi API Cập nhật thông tin
       const payload = {
-        code: editProduct.code,
-        name: editProduct.name,
-        category: editProduct.category,
-        unit: editProduct.unit,
-        profit_margin: editProduct.profit_margin,
-        old_price: editProduct.old_price,
-        status: editProduct.status,
-        description: editProduct.description,
+        code: editProduct.code || '',
+        name: editProduct.name || '',
+        category: editProduct.category || 'women',
+        unit: editProduct.unit || 'Cai',
+        profit_margin: editProduct.profit_margin ?? 0,
+        old_price: editProduct.old_price ?? 0,
+        status: editProduct.status || 'active',
+        description: editProduct.description || '',
         images: finalImages
-      };
+      }
 
-      const response = await fetch(`${API_BASE_URL}/product/${editProduct.id}`, {
+      const response = await adminFetch(`${API_BASE_URL}/product/${editProduct.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      });
+      })
 
-      const data = await response.json();
-      if (data.success) {
-        alert('Cập nhật sản phẩm thành công!');
-        setEditProduct(null);
-        fetchInfo();
-      } else {
-        alert('Lỗi: ' + data.message);
+      const data = await response.json()
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Khong the cap nhat san pham.')
       }
-    } catch (err) {
-      alert("Không thể cập nhật sản phẩm.");
+
+      alert('Cap nhat san pham thanh cong!')
+      setEditProduct(null)
+      fetchInfo()
+    } catch (error) {
+      alert(error.message || 'Khong the cap nhat san pham.')
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   return (
     <div className='list-product'>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Danh sách sản phẩm</h2>
-        <p style={{ color: '#64748b', fontSize: '14px' }}>Tổng: {allProducts.length} sản phẩm</p>
+        <h2>Danh sach san pham</h2>
+        <p style={{ color: '#64748b', fontSize: '14px' }}>
+          Tong: {allProducts.length} san pham
+        </p>
       </div>
 
       <div className='listproduct-format-main'>
-        <p>Hình ảnh</p>
-        <p>Mã SP</p>
-        <p>Tên sản phẩm</p>
-        <p>Hiện trạng</p>
-        <p>Giá lẻ</p>
-        <p>Hành động</p>
+        <p>Hinh anh</p>
+        <p>Ma SP</p>
+        <p>Ten san pham</p>
+        <p>Hien trang</p>
+        <p>Gia le</p>
+        <p>Hanh dong</p>
       </div>
 
       <div className='listproduct-allproducts'>
         <hr />
-        {allProducts.map((product) => (
-          <React.Fragment key={product.id}>
-            <div className='listproduct-format-main listproduct-format'>
-              <img src={resolveImageUrl(product.image)} alt='' className='listproduct-product-icon' />
-              <p style={{ fontWeight: 'bold', color: '#475569' }}>{product.code || 'N/A'}</p>
-              <p>{product.name}</p>
-              <p>
-                <span className={`status-badge ${product.status}`}>
-                  {product.status === 'active' ? 'Hiển thị' : 'Đang ẩn'}
-                </span>
-              </p>
-              <p style={{ color: '#10b981', fontWeight: 'bold' }}>{Number(product.new_price || 0).toLocaleString()}đ</p>
-              <div className='listproduct-actions'>
-                <button className="btn-edit-product" onClick={() => startEdit(product)}>Sửa</button>
-                <img onClick={() => removeProduct(product.id)} className='listproduct-remove-icon' src={cross_icon} alt='Xoá' title="Xóa sản phẩm" />
+        {loading && <p>Dang tai du lieu...</p>}
+
+        {!loading &&
+          allProducts.map((product) => (
+            <React.Fragment key={product.id}>
+              <div className='listproduct-format-main listproduct-format'>
+                <img
+                  src={resolveImageUrl(product.image)}
+                  alt={product.name}
+                  className='listproduct-product-icon'
+                />
+                <p style={{ fontWeight: 'bold', color: '#475569' }}>{product.code || 'N/A'}</p>
+                <p>{product.name}</p>
+                <p>
+                  <span className={`status-badge ${product.status}`}>
+                    {product.status === 'active' ? 'Hien thi' : 'Dang an'}
+                  </span>
+                </p>
+                <p style={{ color: '#10b981', fontWeight: 'bold' }}>
+                  {Number(product.new_price || 0).toLocaleString()}d
+                </p>
+                <div className='listproduct-actions'>
+                  <button className='btn-edit-product' onClick={() => startEdit(product)}>
+                    Sua
+                  </button>
+                  <img
+                    onClick={() => removeProduct(product.id)}
+                    className='listproduct-remove-icon'
+                    src={cross_icon}
+                    alt='Xoa'
+                    title='Xoa san pham'
+                  />
+                </div>
               </div>
-            </div>
-            <hr />
-          </React.Fragment>
-        ))}
+              <hr />
+            </React.Fragment>
+          ))}
       </div>
 
-      {/* ====== MODAL SỬA SẢN PHẨM ====== */}
       {editProduct && (
         <div className='listproduct-edit-modal'>
           <div className='listproduct-edit-card'>
-            <h3 style={{ marginBottom: '20px', color: '#1e293b' }}>Sửa thông tin sản phẩm</h3>
+            <h3 style={{ marginBottom: '20px', color: '#1e293b' }}>Sua thong tin san pham</h3>
 
             <div className='listproduct-edit-grid'>
-              <label>Mã Sản Phẩm
-                <input type='text' value={editProduct.code || ''} onChange={(e) => updateEditField('code', e.target.value)} />
+              <label>
+                Ma san pham
+                <input
+                  type='text'
+                  value={editProduct.code || ''}
+                  onChange={(event) => updateEditField('code', event.target.value)}
+                />
               </label>
 
-              <label>Tên Sản Phẩm
-                <input type='text' value={editProduct.name || ''} onChange={(e) => updateEditField('name', e.target.value)} />
+              <label>
+                Ten san pham
+                <input
+                  type='text'
+                  value={editProduct.name || ''}
+                  onChange={(event) => updateEditField('name', event.target.value)}
+                />
               </label>
 
-              <label>Hiện Trạng (Bán/Ẩn)
-                <select value={editProduct.status || 'active'} onChange={(e) => updateEditField('status', e.target.value)} style={{ color: editProduct.status === 'active' ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
-                  <option value="active">Hiển thị (Đang bán)</option>
-                  <option value="hidden">Ẩn (Ngừng bán)</option>
+              <label>
+                Hien trang
+                <select
+                  value={editProduct.status || 'active'}
+                  onChange={(event) => updateEditField('status', event.target.value)}
+                  style={{
+                    color: editProduct.status === 'active' ? '#10b981' : '#ef4444',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  <option value='active'>Hien thi</option>
+                  <option value='hidden'>An</option>
                 </select>
               </label>
 
-              <label>Danh mục
-                <select value={editProduct.category || 'women'} onChange={(e) => updateEditField('category', e.target.value)}>
-                  <option value="women">Phụ Nữ</option>
-                  <option value="men">Đàn Ông</option>
-                  <option value="kid">Trẻ Em</option>
+              <label>
+                Danh muc
+                <select
+                  value={editProduct.category || 'women'}
+                  onChange={(event) => updateEditField('category', event.target.value)}
+                >
+                  <option value='women'>Phu nu</option>
+                  <option value='men'>Dan ong</option>
+                  <option value='kid'>Tre em</option>
                 </select>
               </label>
 
-              <label>Tỉ Lệ Lợi Nhuận (%)
-                <input type='number' value={editProduct.profit_margin || 0} onChange={(e) => updateEditField('profit_margin', e.target.value)} />
+              <label>
+                Ti le loi nhuan (%)
+                <input
+                  type='number'
+                  value={editProduct.profit_margin || 0}
+                  onChange={(event) => updateEditField('profit_margin', event.target.value)}
+                />
               </label>
 
-              <label>Giá Cũ (Gạch bỏ)
-                <input type='number' value={editProduct.old_price || 0} onChange={(e) => updateEditField('old_price', e.target.value)} />
+              <label>
+                Gia cu
+                <input
+                  type='number'
+                  value={editProduct.old_price || 0}
+                  onChange={(event) => updateEditField('old_price', event.target.value)}
+                />
               </label>
             </div>
 
-            <label style={{ display: 'block', marginTop: '15px' }}>Mô Tả Sản Phẩm
-              <textarea value={editProduct.description || ''} onChange={(e) => updateEditField('description', e.target.value)} rows="3" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', marginTop: '5px' }} />
+            <label style={{ display: 'block', marginTop: '15px' }}>
+              Mo ta san pham
+              <textarea
+                value={editProduct.description || ''}
+                onChange={(event) => updateEditField('description', event.target.value)}
+                rows='3'
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #ccc',
+                  marginTop: '5px'
+                }}
+              />
             </label>
 
-            {/* PHẦN CHỈNH SỬA HÌNH ẢNH */}
-            <div className="image-edit-section" style={{ marginTop: '20px' }}>
-              <p style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '10px' }}>Quản Lý Hình Ảnh (Xóa & Thêm)</p>
-              <div className="image-preview-container">
-                {/* Ảnh cũ */}
-                {existingImages.map((imgUrl, idx) => (
-                  <div key={`old-${idx}`} className="image-wrapper">
-                    <img src={resolveImageUrl(imgUrl)} alt="Cũ" />
-                    <span className="remove-img-btn" onClick={() => removeExistingImage(idx)}>✕</span>
+            <div className='image-edit-section' style={{ marginTop: '20px' }}>
+              <p style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '10px' }}>
+                Quan ly hinh anh
+              </p>
+              <div className='image-preview-container'>
+                {existingImages.map((imgUrl, index) => (
+                  <div key={`old-${index}`} className='image-wrapper'>
+                    <img src={resolveImageUrl(imgUrl)} alt='Cu' />
+                    <span className='remove-img-btn' onClick={() => removeExistingImage(index)}>
+                      x
+                    </span>
                   </div>
                 ))}
 
-                {/* Ảnh mới vừa chọn */}
-                {newImages.map((file, idx) => (
-                  <div key={`new-${idx}`} className="image-wrapper new-badge">
-                    <img src={URL.createObjectURL(file)} alt="Mới" />
-                    <span className="remove-img-btn" onClick={() => removeNewImage(idx)}>✕</span>
+                {newImages.map((file, index) => (
+                  <div key={`new-${index}`} className='image-wrapper new-badge'>
+                    <img src={URL.createObjectURL(file)} alt='Moi' />
+                    <span className='remove-img-btn' onClick={() => removeNewImage(index)}>
+                      x
+                    </span>
                   </div>
                 ))}
 
-                {/* Nút upload */}
-                <label className="upload-more-btn">
-                  <img src={upload_area} alt="Upload" />
-                  <input type="file" multiple hidden onChange={handleNewImageUpload} />
+                <label className='upload-more-btn'>
+                  <img src={upload_area} alt='Upload' />
+                  <input type='file' multiple hidden onChange={handleNewImageUpload} />
                 </label>
               </div>
             </div>
 
             <div className='listproduct-edit-actions'>
-              <button type='button' className='btn-cancel-modal' onClick={() => setEditProduct(null)} disabled={saving}>Huỷ</button>
-              <button type='button' className='btn-save-modal' onClick={submitUpdate} disabled={saving}>
-                {saving ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+              <button
+                type='button'
+                className='btn-cancel-modal'
+                onClick={() => setEditProduct(null)}
+                disabled={saving}
+              >
+                Huy
+              </button>
+              <button
+                type='button'
+                className='btn-save-modal'
+                onClick={submitUpdate}
+                disabled={saving}
+              >
+                {saving ? 'Dang luu...' : 'Luu thay doi'}
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default ListProduct;
+export default ListProduct

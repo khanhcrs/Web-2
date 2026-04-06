@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './AddProduct.css';
 import upload_area from '../../assets/upload_area.svg';
 import { API_BASE_URL } from '../../config';
+import { adminFetch } from '../../lib/adminApi';
 
 const AddProduct = () => {
   const [images, setImages] = useState([]);
@@ -44,7 +45,7 @@ const AddProduct = () => {
         const formData = new FormData();
         formData.append('product', file);
 
-        const uploadResp = await fetch(`${API_BASE_URL}/upload`, {
+        const uploadResp = await adminFetch(`${API_BASE_URL}/upload`, {
           method: 'POST',
           headers: { Accept: 'application/json' },
           body: formData,
@@ -61,7 +62,7 @@ const AddProduct = () => {
         image: uploadedUrls[0],
       };
 
-      const response = await fetch(`${API_BASE_URL}/addproduct`, {
+      const response = await adminFetch(`${API_BASE_URL}/addproduct`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
