@@ -13,26 +13,9 @@ if ($requestPath !== '/' && $publicPath !== false) {
 }
 
 if (str_starts_with($requestPath, '/images/')) {
-    $imagesRoot = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'upload' . DIRECTORY_SEPARATOR . 'images');
-    $imageCandidate = $imagesRoot !== false
-        ? realpath($imagesRoot . DIRECTORY_SEPARATOR . basename($requestPath))
-        : false;
-
-    if ($imagesRoot !== false && $imageCandidate !== false && str_starts_with($imageCandidate, $imagesRoot) && is_file($imageCandidate)) {
-        $extension = strtolower((string) pathinfo($imageCandidate, PATHINFO_EXTENSION));
-        $mimeTypes = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-        ];
-
-        header('Content-Type: ' . ($mimeTypes[$extension] ?? 'application/octet-stream'));
-        header('Content-Length: ' . (string) filesize($imageCandidate));
-        readfile($imageCandidate);
-        return true;
-    }
+    $_GET['file'] = basename($requestPath);
+    require __DIR__ . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'image.php';
+    return true;
 }
 
 require __DIR__ . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'index.php';

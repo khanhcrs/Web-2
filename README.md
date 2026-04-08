@@ -1,5 +1,7 @@
 # Clothify PHP Runtime
 
+XAMPP + MySQL guide: `XAMPP_MYSQL_GUIDE.md`
+
 Repo này đã được chuyển sang mô hình runtime mới:
 
 - `backend-php/`: backend PHP chạy ở `http://127.0.0.1:8000`

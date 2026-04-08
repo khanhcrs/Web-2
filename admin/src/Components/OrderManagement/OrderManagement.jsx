@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import './OrderManagement.css'
-import { API_BASE_URL } from '../../config'
-import { adminFetch } from '../../lib/adminApi'
+import { listOrders, updateOrderStatus } from '../../services/orderService'
 
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Cho xu ly' },
@@ -17,14 +16,14 @@ const statusLabel = (value) => {
   return match ? match.label : value
 }
 
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(amount) || 0)
-}
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(amount) || 0)
 
 const OrderManagement = () => {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -36,15 +35,12 @@ const OrderManagement = () => {
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     setError('')
+
     try {
-      const response = await adminFetch(`${API_BASE_URL}/orders`)
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Khong the tai don hang.')
-      }
-      setOrders(Array.isArray(data.orders) ? data.orders : [])
-    } catch (err) {
-      setError(err.message)
+      const data = await listOrders()
+      setOrders(data)
+    } catch (fetchError) {
+      setError(fetchError.message || 'Khong the tai don hang.')
       setOrders([])
     } finally {
       setLoading(false)
@@ -74,45 +70,38 @@ const OrderManagement = () => {
 
     if (searchTerm.trim()) {
       const normalizedSearch = searchTerm.trim().toLowerCase()
-      result = result.filter((order) => {
-        return (
-          String(order.orderId).toLowerCase().includes(normalizedSearch) ||
-          (order.customer?.name || '').toLowerCase().includes(normalizedSearch) ||
-          (order.customer?.email || '').toLowerCase().includes(normalizedSearch)
-        )
-      })
+      result = result.filter((order) =>
+        String(order.orderId).toLowerCase().includes(normalizedSearch) ||
+        (order.customer?.name || '').toLowerCase().includes(normalizedSearch) ||
+        (order.customer?.email || '').toLowerCase().includes(normalizedSearch)
+      )
     }
 
     if (sortByWard) {
-      result.sort((a, b) => {
-        const addressA = (a.address || a.delivery_address || '').toLowerCase()
-        const addressB = (b.address || b.delivery_address || '').toLowerCase()
+      result.sort((left, right) => {
+        const addressA = (left.address || left.delivery_address || '').toLowerCase()
+        const addressB = (right.address || right.delivery_address || '').toLowerCase()
         return addressA.localeCompare(addressB)
       })
     } else {
-      result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      result.sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
     }
 
     return result
-  }, [orders, statusFilter, startDate, endDate, searchTerm, sortByWard])
+  }, [endDate, orders, searchTerm, sortByWard, startDate, statusFilter])
 
   const handleStatusChange = async (orderId, status) => {
     setUpdatingId(orderId)
+    setError('')
+    setFeedback('')
+
     try {
-      const response = await adminFetch(`${API_BASE_URL}/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      })
-      const data = await response.json()
-      if (!data.success) {
-        alert(`Loi: ${data.message}`)
-        return
-      }
+      const data = await updateOrderStatus(orderId, status)
       setOrders((prev) => prev.map((order) => (order.orderId === orderId ? data.order : order)))
       setSelectedOrder((prev) => (prev?.orderId === orderId ? data.order : prev))
-    } catch (err) {
-      alert('Khong the ket noi may chu!')
+      setFeedback('Da cap nhat trang thai don hang.')
+    } catch (updateError) {
+      setError(updateError.message || 'Khong the cap nhat trang thai don hang.')
     } finally {
       setUpdatingId(null)
     }
@@ -168,6 +157,7 @@ const OrderManagement = () => {
         </div>
 
         {error && <div style={{ marginBottom: '15px', color: '#dc2626', fontWeight: 'bold' }}>{error}</div>}
+        {feedback && <div style={{ marginBottom: '15px', color: '#16a34a', fontWeight: 'bold' }}>{feedback}</div>}
 
         <div className='order-management-result-count' style={{ marginBottom: '15px' }}>
           <span>Ket qua tim thay: </span><strong style={{ color: '#3b82f6', fontSize: '18px' }}>{filteredAndSortedOrders.length}</strong> don hang

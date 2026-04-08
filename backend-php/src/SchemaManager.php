@@ -16,12 +16,22 @@ final class SchemaManager
             return;
         }
 
+        if ((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $this->createMySqlTables($pdo);
+            $this->alignMySqlSchema($pdo);
+            $this->ensureDefaultAdmin($pdo);
+            $this->synchronizeInventorySnapshots($pdo);
+            $this->bootstrapped = true;
+            return;
+        }
+
         $pdo->beginTransaction();
 
         try {
             $this->createTables($pdo);
             $this->alignLegacySchema($pdo);
             $this->ensureDefaultAdmin($pdo);
+            $this->synchronizeInventorySnapshots($pdo);
             $pdo->commit();
             $this->bootstrapped = true;
         } catch (\Throwable $throwable) {
@@ -62,6 +72,7 @@ CREATE TABLE IF NOT EXISTS products (
     available BOOLEAN DEFAULT true,
     status VARCHAR(20) DEFAULT 'active',
     stock_quantity INTEGER DEFAULT 0,
+    initial_stock_quantity INTEGER,
     current_import_price DOUBLE PRECISION DEFAULT 0,
     profit_margin DOUBLE PRECISION DEFAULT 0,
     date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -130,8 +141,128 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 SQL);
     }
 
+    private function createMySqlTables(PDO $pdo): void
+    {
+        $pdo->exec(<<<'SQL'
+CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'customer',
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
+    cart_data LONGTEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    unit VARCHAR(50) NOT NULL DEFAULT 'Cai',
+    image VARCHAR(255) NULL,
+    images LONGTEXT NULL,
+    category VARCHAR(100) NULL,
+    new_price DOUBLE NOT NULL DEFAULT 0,
+    old_price DOUBLE NOT NULL DEFAULT 0,
+    available TINYINT(1) NOT NULL DEFAULT 1,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    stock_quantity INT NOT NULL DEFAULT 0,
+    initial_stock_quantity INT NULL,
+    current_import_price DOUBLE NOT NULL DEFAULT 0,
+    profit_margin DOUBLE NOT NULL DEFAULT 0,
+    date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_products_category (category)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL UNIQUE,
+    customer_id INT UNSIGNED NULL,
+    customer_name VARCHAR(255) NULL,
+    customer_email VARCHAR(255) NULL,
+    total DOUBLE NOT NULL DEFAULT 0,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    shipping_address LONGTEXT NULL,
+    shipping_method VARCHAR(255) NULL,
+    payment_method VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_orders_customer (customer_id),
+    INDEX idx_orders_order_id (order_id),
+    CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    product_id INT UNSIGNED NULL,
+    name VARCHAR(255) NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price DOUBLE NOT NULL DEFAULT 0,
+    size VARCHAR(50) NULL,
+    image VARCHAR(255) NULL,
+    code VARCHAR(50) NULL,
+    unit VARCHAR(50) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_order_items_order (order_id),
+    INDEX idx_order_items_product (product_id),
+    CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    product_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    user_name VARCHAR(255) NULL,
+    rating TINYINT UNSIGNED NOT NULL,
+    comment TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_reviews_product (product_id),
+    INDEX idx_reviews_user (user_id),
+    CONSTRAINT fk_reviews_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS import_receipts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    receipt_code VARCHAR(50) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE IF NOT EXISTS import_receipt_details (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    receipt_id INT UNSIGNED NOT NULL,
+    product_id INT UNSIGNED NOT NULL,
+    import_price DOUBLE NOT NULL,
+    quantity INT NOT NULL,
+    INDEX idx_import_receipt_details_receipt (receipt_id),
+    INDEX idx_import_receipt_details_product (product_id),
+    CONSTRAINT fk_import_receipt_details_receipt FOREIGN KEY (receipt_id) REFERENCES import_receipts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_import_receipt_details_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+SQL);
+    }
+
+    private function alignMySqlSchema(PDO $pdo): void
+    {
+        $pdo->exec(<<<'SQL'
+ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS initial_stock_quantity INT NULL AFTER stock_quantity;
+SQL);
+    }
+
     private function alignLegacySchema(PDO $pdo): void
     {
+        if ((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            return;
+        }
+
         $pdo->exec(<<<'SQL'
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'customer',
@@ -147,6 +278,7 @@ ALTER TABLE products
     ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb,
     ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active',
     ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS initial_stock_quantity INTEGER,
     ADD COLUMN IF NOT EXISTS current_import_price DOUBLE PRECISION DEFAULT 0,
     ADD COLUMN IF NOT EXISTS profit_margin DOUBLE PRECISION DEFAULT 0,
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
@@ -244,5 +376,110 @@ SQL);
                 'email' => $adminEmail,
             ]);
         }
+    }
+
+    private function synchronizeInventorySnapshots(PDO $pdo): void
+    {
+        if ((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $this->synchronizeMySqlInventorySnapshots($pdo);
+            return;
+        }
+
+        $this->synchronizePostgresInventorySnapshots($pdo);
+    }
+
+    private function synchronizeMySqlInventorySnapshots(PDO $pdo): void
+    {
+        $pdo->exec(<<<'SQL'
+UPDATE products p
+LEFT JOIN (
+    SELECT ird.product_id, SUM(ird.quantity) AS total_imported
+    FROM import_receipt_details ird
+    JOIN import_receipts ir ON ir.id = ird.receipt_id
+    WHERE ir.status = 'completed'
+    GROUP BY ird.product_id
+) imports ON imports.product_id = p.id
+SET p.initial_stock_quantity = GREATEST(COALESCE(p.stock_quantity, 0) - COALESCE(imports.total_imported, 0), 0)
+WHERE p.initial_stock_quantity IS NULL
+SQL);
+
+        $pdo->exec(<<<'SQL'
+UPDATE products p
+LEFT JOIN (
+    SELECT ird.product_id, SUM(ird.quantity) AS total_imported
+    FROM import_receipt_details ird
+    JOIN import_receipts ir ON ir.id = ird.receipt_id
+    WHERE ir.status = 'completed'
+    GROUP BY ird.product_id
+) imports ON imports.product_id = p.id
+LEFT JOIN (
+    SELECT oi.product_id, SUM(oi.quantity) AS total_sold
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.status <> 'cancelled'
+      AND oi.product_id IS NOT NULL
+    GROUP BY oi.product_id
+) sales ON sales.product_id = p.id
+SET p.stock_quantity = GREATEST(
+    COALESCE(p.initial_stock_quantity, 0) + COALESCE(imports.total_imported, 0) - COALESCE(sales.total_sold, 0),
+    0
+)
+SQL);
+    }
+
+    private function synchronizePostgresInventorySnapshots(PDO $pdo): void
+    {
+        $pdo->exec(<<<'SQL'
+WITH imports AS (
+    SELECT ird.product_id, SUM(ird.quantity) AS total_imported
+    FROM import_receipt_details ird
+    JOIN import_receipts ir ON ir.id = ird.receipt_id
+    WHERE ir.status = 'completed'
+    GROUP BY ird.product_id
+)
+UPDATE products p
+SET initial_stock_quantity = GREATEST(COALESCE(p.stock_quantity, 0) - COALESCE(imports.total_imported, 0), 0)
+FROM imports
+WHERE p.initial_stock_quantity IS NULL
+  AND imports.product_id = p.id;
+
+UPDATE products
+SET initial_stock_quantity = COALESCE(stock_quantity, 0)
+WHERE initial_stock_quantity IS NULL;
+SQL);
+
+        $pdo->exec(<<<'SQL'
+WITH imports AS (
+    SELECT ird.product_id, SUM(ird.quantity) AS total_imported
+    FROM import_receipt_details ird
+    JOIN import_receipts ir ON ir.id = ird.receipt_id
+    WHERE ir.status = 'completed'
+    GROUP BY ird.product_id
+),
+sales AS (
+    SELECT oi.product_id, SUM(oi.quantity) AS total_sold
+    FROM order_items oi
+    JOIN orders o ON o.id = oi.order_id
+    WHERE o.status <> 'cancelled'
+      AND oi.product_id IS NOT NULL
+    GROUP BY oi.product_id
+)
+UPDATE products p
+SET stock_quantity = GREATEST(
+    COALESCE(p.initial_stock_quantity, 0) + COALESCE(imports.total_imported, 0) - COALESCE(sales.total_sold, 0),
+    0
+)
+FROM imports
+FULL OUTER JOIN sales ON sales.product_id = imports.product_id
+WHERE p.id = COALESCE(imports.product_id, sales.product_id);
+
+UPDATE products
+SET stock_quantity = GREATEST(COALESCE(initial_stock_quantity, 0), 0)
+WHERE id NOT IN (
+    SELECT product_id FROM import_receipt_details
+    UNION
+    SELECT product_id FROM order_items WHERE product_id IS NOT NULL
+);
+SQL);
     }
 }

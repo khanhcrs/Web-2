@@ -1,302 +1,292 @@
-import React, { useState, useEffect } from 'react';
-import './AddImportReceipt.css';
-import { API_BASE_URL } from '../../config';
-import { adminFetch } from '../../lib/adminApi';
+import React, { useEffect, useState } from 'react'
+import './AddImportReceipt.css'
+import { listProducts } from '../../services/productService'
+import {
+  completeImportReceipt,
+  createImportReceipt,
+  getImportReceipt,
+  listImportReceipts,
+  updateImportReceipt
+} from '../../services/importReceiptService'
 
 const AddImportReceipt = () => {
-    // 1. STATE CHO TÌM KIẾM VÀ DANH SÁCH
-    const [receiptsList, setReceiptsList] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
+  const [receiptsList, setReceiptsList] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [products, setProducts] = useState([])
+  const [receiptCode, setReceiptCode] = useState(`PN${Date.now()}`)
+  const [details, setDetails] = useState([])
+  const [editingReceiptId, setEditingReceiptId] = useState(null)
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [importPrice, setImportPrice] = useState('')
+  const [quantity, setQuantity] = useState('')
 
-    // 2. STATE CHO FORM NHẬP LIỆU
-    const [products, setProducts] = useState([]);
-    const [receiptCode, setReceiptCode] = useState(`PN${Date.now()}`);
-    const [details, setDetails] = useState([]);
-    const [editingReceiptId, setEditingReceiptId] = useState(null); // Lưu ID của phiếu đang sửa
+  const fetchProducts = async () => {
+    try {
+      const data = await listProducts()
+      setProducts(data)
+    } catch (error) {
+      console.error(error)
+      setProducts([])
+    }
+  }
 
-    // 3. STATE CHO Ô NHẬP TẠM
-    const [selectedProductId, setSelectedProductId] = useState('');
-    const [importPrice, setImportPrice] = useState('');
-    const [quantity, setQuantity] = useState('');
+  const fetchAllReceipts = async () => {
+    try {
+      const data = await listImportReceipts()
+      setReceiptsList(data)
+    } catch (error) {
+      console.error(error)
+      setReceiptsList([])
+    }
+  }
 
-    // --- TẢI DỮ LIỆU KHI VÀO TRANG ---
-    useEffect(() => {
-        fetchProducts();
-        fetchAllReceipts();
-    }, []);
+  useEffect(() => {
+    fetchProducts()
+    fetchAllReceipts()
+  }, [])
 
-    const fetchProducts = async () => {
-        const res = await adminFetch(`${API_BASE_URL}/allproducts`);
-        setProducts(await res.json());
-    };
+  const filteredReceipts = receiptsList.filter((receipt) =>
+    receipt.receipt_code.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-    const fetchAllReceipts = async () => {
-        const res = await adminFetch(`${API_BASE_URL}/import-receipts`);
-        const data = await res.json();
-        if (data.success) setReceiptsList(data.receipts);
-    };
+  const handleEditReceipt = async (receiptId) => {
+    try {
+      const data = await getImportReceipt(receiptId)
+      setEditingReceiptId(data.receipt.id)
+      setReceiptCode(data.receipt.receipt_code)
+      setDetails(
+        data.details.map((detail) => ({
+          productId: detail.product_id,
+          name: detail.name,
+          importPrice: Number(detail.import_price),
+          quantity: Number(detail.quantity),
+          total: Number(detail.import_price) * Number(detail.quantity)
+        }))
+      )
 
-    // --- CHỨC NĂNG TÌM KIẾM ---
-    const filteredReceipts = receiptsList.filter(r =>
-        r.receipt_code.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    } catch (error) {
+      alert(error.message || 'Loi khi lay thong tin phieu nhap!')
+    }
+  }
 
-    // --- CHỨC NĂNG: BẤM NÚT "SỬA PHIẾU" ---
-    const handleEditReceipt = async (id) => {
-        try {
-            const res = await adminFetch(`${API_BASE_URL}/import-receipts/${id}`);
-            const data = await res.json();
+  const handleCancelEdit = () => {
+    setEditingReceiptId(null)
+    setReceiptCode(`PN${Date.now()}`)
+    setDetails([])
+  }
 
-            if (data.success) {
-                setEditingReceiptId(data.receipt.id);
-                setReceiptCode(data.receipt.receipt_code);
+  const handleAddDetail = () => {
+    if (!selectedProductId || !importPrice || !quantity) {
+      alert('Vui long nhap du gia nhap va so luong!')
+      return
+    }
 
-                // Đổ danh sách sản phẩm cũ vào Form
-                const loadedDetails = data.details.map(d => ({
-                    productId: d.product_id,
-                    name: d.name,
-                    importPrice: Number(d.import_price),
-                    quantity: Number(d.quantity),
-                    total: Number(d.import_price) * Number(d.quantity)
-                }));
-                setDetails(loadedDetails);
+    const product = products.find((entry) => entry.id === Number(selectedProductId))
+    if (!product) {
+      alert('San pham khong ton tai.')
+      return
+    }
 
-                // Tự động cuộn trang xuống chỗ Form sửa
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            }
-        } catch (error) {
-            alert('Lỗi khi lấy thông tin phiếu nhập!');
-        }
-    };
+    if (details.some((detail) => detail.productId === product.id)) {
+      alert('San pham nay da co, vui long xoa dong cu de nhap lai!')
+      return
+    }
 
-    // --- CHỨC NĂNG: HỦY SỬA (QUAY VỀ TẠO MỚI) ---
-    const handleCancelEdit = () => {
-        setEditingReceiptId(null);
-        setReceiptCode(`PN${Date.now()}`);
-        setDetails([]);
-    };
+    setDetails((prev) => [
+      ...prev,
+      {
+        productId: product.id,
+        name: product.name,
+        importPrice: Number(importPrice),
+        quantity: Number(quantity),
+        total: Number(importPrice) * Number(quantity)
+      }
+    ])
 
-    // --- THÊM / XÓA SẢN PHẨM VÀO FORM (CHƯA LƯU DB) ---
-    const handleAddDetail = () => {
-        if (!selectedProductId || !importPrice || !quantity) return alert('Vui lòng nhập đủ Giá nhập, Số lượng!');
+    setSelectedProductId('')
+    setImportPrice('')
+    setQuantity('')
+  }
 
-        const product = products.find(p => p.id === Number(selectedProductId));
-        if (details.findIndex(d => d.productId === product.id) >= 0) return alert('Sản phẩm này đã có, vui lòng xóa dòng cũ để nhập lại!');
+  const handleRemoveDetail = (index) => {
+    setDetails((prev) => prev.filter((_, currentIndex) => currentIndex !== index))
+  }
 
-        const newDetail = {
-            productId: product.id,
-            name: product.name,
-            importPrice: Number(importPrice),
-            quantity: Number(quantity),
-            total: Number(importPrice) * Number(quantity)
-        };
+  const handleSaveReceipt = async (isComplete) => {
+    if (details.length === 0) {
+      alert('Vui long them it nhat 1 san pham!')
+      return
+    }
 
-        setDetails([...details, newDetail]);
-        setSelectedProductId(''); setImportPrice(''); setQuantity('');
-    };
+    try {
+      let currentReceiptId = editingReceiptId
 
-    const handleRemoveDetail = (index) => {
-        const newDetails = [...details];
-        newDetails.splice(index, 1);
-        setDetails(newDetails);
-    };
+      if (editingReceiptId) {
+        await updateImportReceipt(editingReceiptId, { receiptCode, details })
+      } else {
+        const created = await createImportReceipt({ receiptCode, details })
+        currentReceiptId = created.receipt.id
+      }
 
-    // --- NÚT CHỐT: LƯU NHÁP (SỬA) HOẶC HOÀN THÀNH ---
-    const handleSaveReceipt = async (isComplete) => {
-        if (details.length === 0) return alert('Vui lòng thêm ít nhất 1 sản phẩm!');
+      if (isComplete) {
+        await completeImportReceipt(currentReceiptId)
+        alert('Hoan thanh phieu thanh cong! Kho va gia da duoc cap nhat.')
+      } else {
+        alert('Da luu nhap phieu nhap thanh cong!')
+      }
 
-        try {
-            let currentReceiptId = editingReceiptId;
+      handleCancelEdit()
+      fetchAllReceipts()
+      fetchProducts()
+    } catch (error) {
+      alert(error.message || 'Khong the xu ly phieu nhap.')
+    }
+  }
 
-            // BƯỚC 1: LƯU THÔNG TIN PHIẾU (TẠO MỚI HOẶC CẬP NHẬT)
-            if (editingReceiptId) {
-                // Nếu đang Sửa -> Gọi API Cập nhật (PUT)
-                const res = await adminFetch(`${API_BASE_URL}/import-receipts/${editingReceiptId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ receiptCode, details })
-                });
-                const data = await res.json();
-                if (!data.success) return alert(data.message);
-            } else {
-                // Nếu Tạo mới -> Gọi API Tạo (POST)
-                const res = await adminFetch(`${API_BASE_URL}/import-receipts`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ receiptCode, details })
-                });
-                const data = await res.json();
-                if (!data.success) return alert(data.message);
-                currentReceiptId = data.receipt.id; // Lấy ID vừa tạo
-            }
+  const grandTotal = details.reduce((sum, item) => sum + item.total, 0)
 
-            // BƯỚC 2: NẾU BẤM "HOÀN THÀNH", GỌI API CHỐT KHO & TÍNH GIÁ
-            if (isComplete) {
-                const completeRes = await adminFetch(`${API_BASE_URL}/import-receipts/${currentReceiptId}/complete`, {
-                    method: 'POST'
-                });
-                const completeData = await completeRes.json();
+  return (
+    <div className='add-receipt-container'>
+      <h2 style={{ color: '#0f172a', marginBottom: '5px' }}>Quan ly nhap kho</h2>
+      <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '20px' }}>
+        Tim kiem, sua phieu nhap hoac lap phieu nhap hang moi.
+      </p>
 
-                if (completeData.success) {
-                    alert('✅ HOÀN THÀNH PHIẾU THÀNH CÔNG! Kho và Giá vốn đã được tự động tính lại.');
-                } else {
-                    return alert('❌ Lỗi chốt kho: ' + completeData.message);
-                }
-            } else {
-                alert('📝 Đã LƯU NHÁP phiếu nhập thành công!');
-            }
-
-            // Làm sạch Form và tải lại bảng
-            handleCancelEdit();
-            fetchAllReceipts();
-        } catch (error) {
-            alert('Không thể kết nối đến Server!');
-        }
-    };
-
-    const grandTotal = details.reduce((sum, item) => sum + item.total, 0);
-
-    return (
-        <div className="add-receipt-container">
-            <h2 style={{ color: '#0f172a', marginBottom: '5px' }}>Quản Lý Nhập Kho</h2>
-            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '20px' }}>
-                Tìm kiếm, sửa phiếu nháp hoặc lập phiếu nhập hàng mới.
-            </p>
-
-            {/* ====== PHẦN 1: TÌM KIẾM VÀ DANH SÁCH PHIẾU ====== */}
-            <div className="receipt-form-box">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h4 style={{ margin: 0 }}>Lịch sử Phiếu Nhập</h4>
-                    <input
-                        type="text"
-                        placeholder="🔍 Tìm theo Mã phiếu (VD: PN001)..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ padding: '8px 15px', width: '250px', borderRadius: '6px', border: '1px solid #ccc' }}
-                    />
-                </div>
-
-                <table className="receipt-table" style={{ marginBottom: 0 }}>
-                    <thead>
-                        <tr>
-                            <th>Mã Phiếu</th>
-                            <th>Ngày Lập</th>
-                            <th>Trạng Thái</th>
-                            <th>Hành Động</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredReceipts.length === 0 ? (
-                            <tr><td colSpan="4" style={{ textAlign: 'center' }}>Không tìm thấy phiếu nào</td></tr>
-                        ) : (
-                            filteredReceipts.map(r => (
-                                <tr key={r.id} style={{ backgroundColor: editingReceiptId === r.id ? '#eff6ff' : 'white' }}>
-                                    <td style={{ fontWeight: 'bold', color: '#3b82f6' }}>{r.receipt_code}</td>
-                                    <td>{new Date(r.created_at).toLocaleString('vi-VN')}</td>
-                                    <td>
-                                        <span style={{
-                                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold',
-                                            backgroundColor: r.status === 'completed' ? '#dcfce7' : '#fef9c3',
-                                            color: r.status === 'completed' ? '#16a34a' : '#ca8a04'
-                                        }}>
-                                            {r.status === 'completed' ? 'Đã chốt kho' : 'Lưu nháp'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {/* ĐÂY CHÍNH LÀ LOGIC: CHỈ HIỆN NÚT SỬA KHI CHƯA HOÀN THÀNH */}
-                                        {r.status === 'pending' ? (
-                                            <button
-                                                onClick={() => handleEditReceipt(r.id)}
-                                                style={{ background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                                            >
-                                                ✏️ Sửa phiếu
-                                            </button>
-                                        ) : (
-                                            <span style={{ color: '#94a3b8', fontSize: '13px' }}>🔒 Đã khóa</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* ====== PHẦN 2: FORM LẬP / SỬA PHIẾU ====== */}
-            <div className="receipt-form-box" style={{ border: editingReceiptId ? '2px solid #3b82f6' : '1px dashed #007bff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ color: editingReceiptId ? '#3b82f6' : '#333' }}>
-                        {editingReceiptId ? `ĐANG SỬA: ${receiptCode}` : 'LẬP PHIẾU MỚI'}
-                    </h4>
-                    {editingReceiptId && (
-                        <button onClick={handleCancelEdit} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>
-                            ✕ Hủy Sửa / Tạo Mới
-                        </button>
-                    )}
-                </div>
-
-                <div className="receipt-header" style={{ marginTop: '15px' }}>
-                    <label>Mã Phiếu Nhập: </label>
-                    <input type="text" value={receiptCode} onChange={(e) => setReceiptCode(e.target.value)} />
-                </div>
-
-                <div className="receipt-inputs">
-                    <select value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)}>
-                        <option value="" disabled>-- Chọn sản phẩm cần nhập --</option>
-                        {products.map(p => (
-                            <option key={p.id} value={p.id}>{p.code ? `[${p.code}]` : ''} {p.name}</option>
-                        ))}
-                    </select>
-
-                    <input type="number" placeholder="Số lượng" value={quantity} onChange={(e) => setQuantity(e.target.value)} min="1" />
-                    <input type="number" placeholder="Giá nhập (VNĐ)" value={importPrice} onChange={(e) => setImportPrice(e.target.value)} min="0" />
-
-                    <button className="btn-add-detail" onClick={handleAddDetail}>+ Thêm</button>
-                </div>
-            </div>
-
-            {/* ====== PHẦN 3: DANH SÁCH CHI TIẾT SẼ NHẬP ====== */}
-            <div className="receipt-details-list">
-                <table className="receipt-table">
-                    <thead>
-                        <tr>
-                            <th>STT</th>
-                            <th>Tên Sản Phẩm</th>
-                            <th>Số lượng</th>
-                            <th>Đơn giá nhập</th>
-                            <th>Thành tiền</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {details.length === 0 ? (
-                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>Chưa có sản phẩm nào</td></tr>
-                        ) : (
-                            details.map((item, index) => (
-                                <tr key={index}>
-                                    <td>{index + 1}</td>
-                                    <td>{item.name}</td>
-                                    <td>{item.quantity}</td>
-                                    <td>{item.importPrice.toLocaleString()} ₫</td>
-                                    <td>{item.total.toLocaleString()} ₫</td>
-                                    <td><button className="btn-remove" onClick={() => handleRemoveDetail(index)}>X</button></td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                <div className="receipt-grand-total">
-                    <h3>Tổng tiền nhập: <span style={{ color: 'red' }}>{grandTotal.toLocaleString()} ₫</span></h3>
-                </div>
-            </div>
-
-            {/* ====== NÚT LƯU VÀ HOÀN THÀNH ====== */}
-            <div className="receipt-actions">
-                <button className="btn-save-draft" onClick={() => handleSaveReceipt(false)}>LƯU NHÁP PHIẾU (Chưa nhập kho)</button>
-                <button className="btn-complete" onClick={() => handleSaveReceipt(true)}>HOÀN THÀNH (Cập nhật Kho & Giá)</button>
-            </div>
+      <div className='receipt-form-box'>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <h4 style={{ margin: 0 }}>Lich su phieu nhap</h4>
+          <input
+            type='text'
+            placeholder='Tim theo ma phieu...'
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            style={{ padding: '8px 15px', width: '250px', borderRadius: '6px', border: '1px solid #ccc' }}
+          />
         </div>
-    );
-};
 
-export default AddImportReceipt;
+        <table className='receipt-table' style={{ marginBottom: 0 }}>
+          <thead>
+            <tr>
+              <th>Ma phieu</th>
+              <th>Ngay lap</th>
+              <th>Trang thai</th>
+              <th>Hanh dong</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredReceipts.length === 0 ? (
+              <tr><td colSpan='4' style={{ textAlign: 'center' }}>Khong tim thay phieu nao</td></tr>
+            ) : (
+              filteredReceipts.map((receipt) => (
+                <tr key={receipt.id} style={{ backgroundColor: editingReceiptId === receipt.id ? '#eff6ff' : 'white' }}>
+                  <td style={{ fontWeight: 'bold', color: '#3b82f6' }}>{receipt.receipt_code}</td>
+                  <td>{new Date(receipt.created_at).toLocaleString('vi-VN')}</td>
+                  <td>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        backgroundColor: receipt.status === 'completed' ? '#dcfce7' : '#fef9c3',
+                        color: receipt.status === 'completed' ? '#16a34a' : '#ca8a04'
+                      }}
+                    >
+                      {receipt.status === 'completed' ? 'Da chot kho' : 'Luu nhap'}
+                    </span>
+                  </td>
+                  <td>
+                    {receipt.status === 'pending' ? (
+                      <button
+                        onClick={() => handleEditReceipt(receipt.id)}
+                        style={{ background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        Sua phieu
+                      </button>
+                    ) : (
+                      <span style={{ color: '#94a3b8', fontSize: '13px' }}>Da khoa</span>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className='receipt-form-box' style={{ border: editingReceiptId ? '2px solid #3b82f6' : '1px dashed #007bff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4 style={{ color: editingReceiptId ? '#3b82f6' : '#333' }}>
+            {editingReceiptId ? `Dang sua: ${receiptCode}` : 'Lap phieu moi'}
+          </h4>
+          {editingReceiptId && (
+            <button onClick={handleCancelEdit} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>
+              Huy sua / Tao moi
+            </button>
+          )}
+        </div>
+
+        <div className='receipt-header' style={{ marginTop: '15px' }}>
+          <label>Ma phieu nhap: </label>
+          <input type='text' value={receiptCode} onChange={(event) => setReceiptCode(event.target.value)} />
+        </div>
+
+        <div className='receipt-inputs'>
+          <select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}>
+            <option value='' disabled>-- Chon san pham can nhap --</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>{product.code ? `[${product.code}]` : ''} {product.name}</option>
+            ))}
+          </select>
+
+          <input type='number' placeholder='So luong' value={quantity} onChange={(event) => setQuantity(event.target.value)} min='1' />
+          <input type='number' placeholder='Gia nhap (VND)' value={importPrice} onChange={(event) => setImportPrice(event.target.value)} min='0' />
+
+          <button className='btn-add-detail' onClick={handleAddDetail}>+ Them</button>
+        </div>
+      </div>
+
+      <div className='receipt-details-list'>
+        <table className='receipt-table'>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Ten san pham</th>
+              <th>So luong</th>
+              <th>Don gia nhap</th>
+              <th>Thanh tien</th>
+              <th>Thao tac</th>
+            </tr>
+          </thead>
+          <tbody>
+            {details.length === 0 ? (
+              <tr><td colSpan='6' style={{ textAlign: 'center', padding: '20px' }}>Chua co san pham nao</td></tr>
+            ) : (
+              details.map((item, index) => (
+                <tr key={`${item.productId}-${index}`}>
+                  <td>{index + 1}</td>
+                  <td>{item.name}</td>
+                  <td>{item.quantity}</td>
+                  <td>{item.importPrice.toLocaleString()} VND</td>
+                  <td>{item.total.toLocaleString()} VND</td>
+                  <td><button className='btn-remove' onClick={() => handleRemoveDetail(index)}>X</button></td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        <div className='receipt-grand-total'>
+          <h3>Tong tien nhap: <span style={{ color: 'red' }}>{grandTotal.toLocaleString()} VND</span></h3>
+        </div>
+      </div>
+
+      <div className='receipt-actions'>
+        <button className='btn-save-draft' onClick={() => handleSaveReceipt(false)}>LUU NHAP PHIEU</button>
+        <button className='btn-complete' onClick={() => handleSaveReceipt(true)}>HOAN THANH</button>
+      </div>
+    </div>
+  )
+}
+
+export default AddImportReceipt

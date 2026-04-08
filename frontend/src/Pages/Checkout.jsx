@@ -1,9 +1,9 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
-import './Checkout.css'
-import { ShopContext } from '../Context/ShopContext'
-import { API_BASE_URL, resolveImageUrl } from '../config'
+import './CSS/Checkout.css'
 import { Link } from 'react-router-dom'
+import { ShopContext } from '../Context/ShopContext'
 import { AuthContext } from '../Context/AuthContext'
+import { createOrder } from '../services/orderService'
 
 const initialFormState = {
   name: '',
@@ -16,17 +16,17 @@ const initialFormState = {
   expiryMonth: '',
   expiryYear: '',
   cvv: '',
-};
+}
 
 const paymentMethodLabels = {
-  credit_card: 'Thẻ tín dụng/Ghi nợ',
-  cash_on_delivery: 'Thanh toán khi nhận hàng',
-};
+  credit_card: 'The tin dung/Ghi no',
+  cash_on_delivery: 'Thanh toan khi nhan hang',
+}
 
 const formatCurrency = (value) => {
-  const amount = Number(value) || 0;
-  return `${amount.toLocaleString('vi-VN')} ₫`;
-};
+  const amount = Number(value) || 0
+  return `${amount.toLocaleString('vi-VN')} VND`
+}
 
 const Checkout = () => {
   const { cartItems, products, clearCart } = useContext(ShopContext)
@@ -36,119 +36,127 @@ const Checkout = () => {
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
 
-  // ==========================================
-  // LOGIC TỰ ĐỘNG ĐIỀN THÔNG TIN TỪ HỒ SƠ (ĐÃ NÂNG CẤP)
-  // ==========================================
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      return
+    }
 
-    // 1. Xác định key của user (giống logic bên AccountProfile)
-    const userKey = user.id || user.email || user.name;
+    const userKey = user.id || user.email || user.name
 
-    // 2. Mặc định tên và email từ AuthContext
-    let defaultName = user.name || '';
-    let defaultPhone = '';
-    let defaultAddress = '';
+    let defaultName = user.name || ''
+    let defaultPhone = ''
+    let defaultAddress = ''
 
-    // 3. Tìm trong Sổ địa chỉ (localStorage)
     try {
-      const storedAddresses = localStorage.getItem('account_addresses');
+      const storedAddresses = localStorage.getItem('account_addresses')
       if (storedAddresses) {
-        const parsed = JSON.parse(storedAddresses);
-        const userAddressList = parsed[userKey];
+        const parsed = JSON.parse(storedAddresses)
+        const userAddressList = parsed[userKey]
 
-        // Nếu user có lưu địa chỉ, lấy địa chỉ đầu tiên (ưu tiên) để tự điền
         if (Array.isArray(userAddressList) && userAddressList.length > 0) {
-          const firstAddress = userAddressList[0];
+          const firstAddress = userAddressList[0]
 
-          defaultName = firstAddress.fullName || defaultName;
-          defaultPhone = firstAddress.phone || '';
+          defaultName = firstAddress.fullName || defaultName
+          defaultPhone = firstAddress.phone || ''
 
-          // Nối các trường địa chỉ lại thành 1 chuỗi
           const addressParts = [
             firstAddress.street,
             firstAddress.ward,
             firstAddress.district,
             firstAddress.city
-          ].filter(Boolean); // filter(Boolean) để loại bỏ các trường bị rỗng
+          ].filter(Boolean)
 
-          defaultAddress = addressParts.join(', ');
+          defaultAddress = addressParts.join(', ')
         }
       }
-    } catch (error) {
-      console.error('Không thể đọc dữ liệu địa chỉ:', error);
+    } catch (storageError) {
+      console.error('Khong the doc du lieu dia chi.', storageError)
     }
 
-    // 4. Đưa dữ liệu vào Form
     setFormData((prev) => ({
       ...prev,
       name: prev.name || defaultName,
       email: user.email || '',
       phone: prev.phone || defaultPhone,
       address: prev.address || defaultAddress
-    }));
+    }))
+  }, [user])
 
-  }, [user]);
-  // ==========================================
+  const items = useMemo(
+    () =>
+      Object.entries(cartItems)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([key, quantity]) => {
+          const [productId, size] = key.split('-')
+          const product = products.find((entry) => entry.id === Number(productId))
+          if (!product) {
+            return null
+          }
 
-  const items = useMemo(() =>
-    Object.entries(cartItems)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([key, quantity]) => {
-        const [productId, size] = key.split('-');
-        const product = products.find((p) => p.id === Number(productId));
-        if (!product) return null;
-        return {
-          id: product.id,
-          key,
-          name: product.name,
-          image: product.image,
-          price: product.new_price,
-          quantity,
-          size: size !== 'default' ? size : null,
-        };
-      }).filter(Boolean),
-    [products, cartItems]
-  );
+          return {
+            id: product.id,
+            key,
+            name: product.name,
+            image: product.image,
+            price: product.new_price,
+            quantity,
+            size: size !== 'default' ? size : null,
+          }
+        })
+        .filter(Boolean),
+    [cartItems, products]
+  )
 
   const hasItems = items.length > 0
   const isEmailSynced = Boolean(user?.email)
-  const total = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
+  const total = useMemo(
+    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [items]
+  )
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target;
-    if (name === 'email' && user?.email) return;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+    const { name, value } = event.target
+    if (name === 'email' && user?.email) {
+      return
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
 
   const handlePaymentMethodChange = (event) => {
-    const method = event.target.value;
+    const method = event.target.value
     setFormData((prev) => ({
       ...prev,
       paymentMethod: method,
-      ...(method !== 'credit_card' ? { cardNumber: '', cardholderName: '', expiryMonth: '', expiryYear: '', cvv: '' } : {}),
-    }));
-  };
+      ...(method !== 'credit_card'
+        ? {
+            cardNumber: '',
+            cardholderName: '',
+            expiryMonth: '',
+            expiryYear: '',
+            cvv: ''
+          }
+        : {})
+    }))
+  }
 
   const handleSubmit = async (event) => {
-    event.preventDefault();
+    event.preventDefault()
 
     if (!hasItems) {
-      setError('Giỏ hàng của bạn đang trống.');
-      return;
+      setError('Gio hang cua ban dang trong.')
+      return
     }
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.address.trim() || !formData.phone.trim()) {
-      setError('Vui lòng điền đầy đủ Họ tên, Email, Địa chỉ và Số điện thoại.');
-      return;
+      setError('Vui long dien day du ho ten, email, dia chi va so dien thoai.')
+      return
     }
 
-    setSubmitting(true);
-    setError('');
+    setSubmitting(true)
+    setError('')
 
     try {
-      const dbStatus = formData.paymentMethod === 'credit_card' ? 'processing' : 'pending';
-
       const payload = {
         customerId: user ? user.id : null,
         customerName: formData.name.trim(),
@@ -162,22 +170,12 @@ const Checkout = () => {
           size: item.size
         })),
         total,
-        status: dbStatus,
+        status: formData.paymentMethod === 'credit_card' ? 'processing' : 'pending',
         shippingAddress: formData.address.trim(),
         paymentMethod: formData.paymentMethod
-      };
-
-      const response = await fetch(`${API_BASE_URL}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Thanh toán thất bại.');
       }
+
+      const data = await createOrder(payload)
 
       setOrder({
         ...data.order,
@@ -185,142 +183,190 @@ const Checkout = () => {
         paymentStatus: formData.paymentMethod === 'credit_card' ? 'paid' : 'pending',
         shippingAddress: formData.address.trim(),
         customerPhone: formData.phone.trim()
-      });
+      })
 
-      clearCart();
-      setFormData(initialFormState);
+      clearCart()
+      setFormData(initialFormState)
     } catch (submitError) {
-      setError(submitError.message || 'Thanh toán thất bại.');
+      setError(submitError.message || 'Thanh toan that bai.')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   if (order) {
     return (
-      <div className="checkout">
-        <h1>Thanh toán</h1>
-        <div className="checkout-success">
-          <h2>Đặt hàng thành công!</h2>
-          <div className="order-summary-box">
-            <p>Mã đơn hàng: <strong>#{order.orderId}</strong></p>
-            <p>Người nhận: <strong>{order.customerName}</strong></p>
-            <p>SĐT: <strong>{order.customerPhone}</strong></p>
-            <p>Địa chỉ: <strong>{order.shippingAddress}</strong></p>
-            <p>Phương thức: {paymentMethodLabels[order.paymentMethod]}</p>
+      <div className='checkout'>
+        <h1>Thanh toan</h1>
+        <div className='checkout-success'>
+          <h2>Dat hang thanh cong!</h2>
+          <div className='order-summary-box'>
+            <p>Ma don hang: <strong>#{order.orderId}</strong></p>
+            <p>Nguoi nhan: <strong>{order.customerName}</strong></p>
+            <p>SDT: <strong>{order.customerPhone}</strong></p>
+            <p>Dia chi: <strong>{order.shippingAddress}</strong></p>
+            <p>Phuong thuc: {paymentMethodLabels[order.paymentMethod]}</p>
           </div>
-          <div className="checkout-success-items">
+          <div className='checkout-success-items'>
             {order.items?.map((item) => (
-              <div key={item.productId} className="checkout-success-item">
+              <div key={`${item.productId}-${item.size || 'default'}`} className='checkout-success-item'>
                 <span>{item.name} (x{item.quantity})</span>
                 <span>{formatCurrency(item.price * item.quantity)}</span>
               </div>
             ))}
           </div>
-          <div className="checkout-success-total">Tổng cộng: {formatCurrency(order.total)}</div>
-          <Link className="checkout-success-link" to="/">Tiếp tục mua sắm</Link>
+          <div className='checkout-success-total'>Tong cong: {formatCurrency(order.total)}</div>
+          <Link className='checkout-success-link' to='/'>
+            Tiep tuc mua sam
+          </Link>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="checkout">
-      <h1>Thanh toán</h1>
-      <div className="checkout-content">
-        <div className="checkout-summary">
-          <h2>Đơn hàng của bạn</h2>
+    <div className='checkout'>
+      <h1>Thanh toan</h1>
+      <div className='checkout-content'>
+        <div className='checkout-summary'>
+          <h2>Don hang cua ban</h2>
           {items.map((item) => (
-            <div key={item.key} className="checkout-summary-item">
+            <div key={item.key} className='checkout-summary-item'>
               <span>{item.name} (x{item.quantity})</span>
               <span>{formatCurrency(item.price * item.quantity)}</span>
             </div>
           ))}
-          <div className="checkout-summary-total">Tổng cộng: {formatCurrency(total)}</div>
+          <div className='checkout-summary-total'>Tong cong: {formatCurrency(total)}</div>
         </div>
 
-        <form className="checkout-form" onSubmit={handleSubmit}>
-          <div className="checkout-form-group">
-            <label>Họ và tên</label>
-            <input name="name" value={formData.name} onChange={handleInputChange} placeholder="Nguyễn Văn A" required />
+        <form className='checkout-form' onSubmit={handleSubmit}>
+          <div className='checkout-form-group'>
+            <label>Ho va ten</label>
+            <input
+              name='name'
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder='Nguyen Van A'
+              required
+            />
           </div>
-          <div className="checkout-form-group">
-            <label>Số điện thoại</label>
-            <input name="phone" value={formData.phone} onChange={handleInputChange} placeholder="090xxxxxxx" required />
+
+          <div className='checkout-form-group'>
+            <label>So dien thoai</label>
+            <input
+              name='phone'
+              value={formData.phone}
+              onChange={handleInputChange}
+              placeholder='090xxxxxxx'
+              required
+            />
           </div>
-          <div className="checkout-form-group">
+
+          <div className='checkout-form-group'>
             <label>Email</label>
-            <input name="email" type="email" value={formData.email} onChange={isEmailSynced ? undefined : handleInputChange} readOnly={isEmailSynced} required />
+            <input
+              name='email'
+              type='email'
+              value={formData.email}
+              onChange={isEmailSynced ? undefined : handleInputChange}
+              readOnly={isEmailSynced}
+              required
+            />
           </div>
-          <div className="checkout-form-group">
-            <label>Địa chỉ giao hàng</label>
-            <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} required />
+
+          <div className='checkout-form-group'>
+            <label>Dia chi giao hang</label>
+            <textarea
+              name='address'
+              value={formData.address}
+              onChange={handleInputChange}
+              rows={3}
+              required
+            />
           </div>
-          <div className="checkout-form-group">
-            <label>Phương thức thanh toán</label>
-            <select name="paymentMethod" value={formData.paymentMethod} onChange={handlePaymentMethodChange}>
-              <option value="cash_on_delivery">Thanh toán khi nhận hàng</option>
-              <option value="credit_card">Thẻ tín dụng/Ghi nợ</option>
+
+          <div className='checkout-form-group'>
+            <label>Phuong thuc thanh toan</label>
+            <select name='paymentMethod' value={formData.paymentMethod} onChange={handlePaymentMethodChange}>
+              <option value='cash_on_delivery'>Thanh toan khi nhan hang</option>
+              <option value='credit_card'>The tin dung/Ghi no</option>
             </select>
           </div>
+
           {formData.paymentMethod === 'credit_card' && (
-
-            <div className="checkout-card-fields">
-
-              <div className="checkout-form-group">
-
-                <label htmlFor="cardNumber">Số thẻ</label>
-
-                <input id="cardNumber" name="cardNumber" value={formData.cardNumber} onChange={handleInputChange} placeholder="1234 5678 9012 3456" required />
-
+            <div className='checkout-card-fields'>
+              <div className='checkout-form-group'>
+                <label htmlFor='cardNumber'>So the</label>
+                <input
+                  id='cardNumber'
+                  name='cardNumber'
+                  value={formData.cardNumber}
+                  onChange={handleInputChange}
+                  placeholder='1234 5678 9012 3456'
+                  required
+                />
               </div>
 
-              <div className="checkout-form-group">
-
-                <label htmlFor="cardholderName">Tên chủ thẻ</label>
-
-                <input id="cardholderName" name="cardholderName" value={formData.cardholderName} onChange={handleInputChange} placeholder="Tên in trên thẻ" required />
-
+              <div className='checkout-form-group'>
+                <label htmlFor='cardholderName'>Ten chu the</label>
+                <input
+                  id='cardholderName'
+                  name='cardholderName'
+                  value={formData.cardholderName}
+                  onChange={handleInputChange}
+                  placeholder='Ten in tren the'
+                  required
+                />
               </div>
 
-              <div className="checkout-form-row">
-
-                <div className="checkout-form-group">
-
-                  <label htmlFor="expiryMonth">Tháng hết hạn</label>
-
-                  <input id="expiryMonth" name="expiryMonth" value={formData.expiryMonth} onChange={handleInputChange} placeholder="MM" required />
-
+              <div className='checkout-form-row'>
+                <div className='checkout-form-group'>
+                  <label htmlFor='expiryMonth'>Thang het han</label>
+                  <input
+                    id='expiryMonth'
+                    name='expiryMonth'
+                    value={formData.expiryMonth}
+                    onChange={handleInputChange}
+                    placeholder='MM'
+                    required
+                  />
                 </div>
 
-                <div className="checkout-form-group">
-
-                  <label htmlFor="expiryYear">Năm hết hạn</label>
-
-                  <input id="expiryYear" name="expiryYear" value={formData.expiryYear} onChange={handleInputChange} placeholder="YYYY" required />
-
+                <div className='checkout-form-group'>
+                  <label htmlFor='expiryYear'>Nam het han</label>
+                  <input
+                    id='expiryYear'
+                    name='expiryYear'
+                    value={formData.expiryYear}
+                    onChange={handleInputChange}
+                    placeholder='YYYY'
+                    required
+                  />
                 </div>
 
-                <div className="checkout-form-group">
-
-                  <label htmlFor="cvv">CVV</label>
-
-                  <input id="cvv" name="cvv" value={formData.cvv} onChange={handleInputChange} placeholder="123" required />
-
+                <div className='checkout-form-group'>
+                  <label htmlFor='cvv'>CVV</label>
+                  <input
+                    id='cvv'
+                    name='cvv'
+                    value={formData.cvv}
+                    onChange={handleInputChange}
+                    placeholder='123'
+                    required
+                  />
                 </div>
-
               </div>
-
             </div>
-
           )}
 
-          {error && <p className="checkout-error">{error}</p>}
-          <button type="submit" disabled={submitting}>{submitting ? 'Đang xử lý...' : 'Đặt hàng'}</button>
+          {error && <p className='checkout-error'>{error}</p>}
+          <button type='submit' disabled={submitting}>
+            {submitting ? 'Dang xu ly...' : 'Dat hang'}
+          </button>
         </form>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Checkout;
+export default Checkout

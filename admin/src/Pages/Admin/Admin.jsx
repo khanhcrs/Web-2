@@ -18,13 +18,13 @@ const Admin = () => {
       <Routes>
         <Route path='/' element={<Dashboard />} />
         <Route index element={<Dashboard />} />
-        <Route path='/addproduct' element={<AddProduct />} />
-        <Route path='/listproduct' element={<ListProduct />} />
-        <Route path='/ordermanagement' element={<OrderManagement />} />
-        <Route path='/customermanagement' element={<CustomerManagement />} />
-        <Route path='/add-receipt' element={<AddImportReceipt />} />
-        <Route path='/pricemanagement' element={<PriceManagement />} />
-        <Route path='/inventoryreport' element={<InventoryReport />} />
+        <Route path='addproduct' element={<AddProduct />} />
+        <Route path='listproduct' element={<ListProduct />} />
+        <Route path='ordermanagement' element={<OrderManagement />} />
+        <Route path='customermanagement' element={<CustomerManagement />} />
+        <Route path='add-receipt' element={<AddImportReceipt />} />
+        <Route path='pricemanagement' element={<PriceManagement />} />
+        <Route path='inventoryreport' element={<InventoryReport />} />
 
         <Route path='*' element={<Dashboard />} />
       </Routes>

@@ -1,221 +1,414 @@
-import React, { useState } from 'react';
-import './InventoryReport.css';
-import { API_BASE_URL } from '../../config';
-import { adminFetch } from '../../lib/adminApi';
+import React, { useEffect, useState } from 'react'
+import './InventoryReport.css'
+import {
+  getImportExportReport,
+  getLowStockReport,
+  getStockAtTimeReport
+} from '../../services/reportService'
+
+const getTodayDateInputValue = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+const getCurrentDateTimeInputValue = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const getErrorMessage = (error) => {
+  if (error instanceof Error && error.message.trim() !== '') {
+    return error.message
+  }
+
+  return 'Khong the tai du lieu.'
+}
 
 const InventoryReport = () => {
-    // State quản lý Tab đang active (1, 2, hoặc 3)
-    const [activeTab, setActiveTab] = useState(1);
+  const [activeTab, setActiveTab] = useState(1)
 
-    // State cho Tab 1: Tồn kho tại 1 thời điểm
-    const [targetTime, setTargetTime] = useState('');
-    const [category, setCategory] = useState('all');
-    const [stockData, setStockData] = useState([]);
+  const [targetTime, setTargetTime] = useState(getCurrentDateTimeInputValue)
+  const [category, setCategory] = useState('all')
+  const [stockData, setStockData] = useState([])
 
-    // State cho Tab 2: Báo cáo Nhập - Xuất
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [ioData, setIoData] = useState([]);
+  const [startDate, setStartDate] = useState(getTodayDateInputValue)
+  const [endDate, setEndDate] = useState(getTodayDateInputValue)
+  const [ioData, setIoData] = useState([])
 
-    // State cho Tab 3: Cảnh báo sắp hết hàng
-    const [threshold, setThreshold] = useState(10); // Mặc định cảnh báo dưới 10 cái
-    const [lowStockData, setLowStockData] = useState([]);
+  const [threshold, setThreshold] = useState(10)
+  const [lowStockData, setLowStockData] = useState([])
 
-    // --- CÁC HÀM GỌI API ---
+  const [loadingState, setLoadingState] = useState({
+    stock: false,
+    io: false,
+    lowStock: false
+  })
+  const [errorState, setErrorState] = useState({
+    stock: '',
+    io: '',
+    lowStock: ''
+  })
 
-    const fetchStockAtTime = async () => {
-        if (!targetTime) return alert('Vui lòng chọn mốc thời gian!');
-        try {
-            const res = await adminFetch(`${API_BASE_URL}/api/reports/stock-at-time?targetTime=${targetTime}&category=${category}`);
-            const data = await res.json();
-            if (data.success) setStockData(data.data);
-            else alert(data.message);
-        } catch (error) {
-            console.error(error);
-            alert('Lỗi kết nối máy chủ');
-        }
-    };
+  const fetchStockAtTime = async ({ silent = false } = {}) => {
+    if (!targetTime) {
+      if (!silent) {
+        alert('Vui long chon moc thoi gian!')
+      }
+      return
+    }
 
-    const fetchIOReport = async () => {
-        if (!startDate || !endDate) return alert('Vui lòng chọn đầy đủ Từ ngày và Đến ngày!');
-        if (new Date(startDate) > new Date(endDate)) return alert('Ngày bắt đầu không được lớn hơn ngày kết thúc!');
-        try {
-            const res = await adminFetch(`${API_BASE_URL}/api/reports/import-export?startDate=${startDate}&endDate=${endDate}`);
-            const data = await res.json();
-            if (data.success) setIoData(data.data);
-            else alert(data.message);
-        } catch (error) {
-            console.error(error);
-            alert('Lỗi kết nối máy chủ');
-        }
-    };
+    setLoadingState((prev) => ({ ...prev, stock: true }))
+    setErrorState((prev) => ({ ...prev, stock: '' }))
 
-    const fetchLowStock = async () => {
-        if (threshold === '' || threshold < 0) return alert('Ngưỡng số lượng không hợp lệ!');
-        try {
-            const res = await adminFetch(`${API_BASE_URL}/api/reports/low-stock?threshold=${threshold}`);
-            const data = await res.json();
-            if (data.success) setLowStockData(data.data);
-            else alert(data.message);
-        } catch (error) {
-            console.error(error);
-            alert('Lỗi kết nối máy chủ');
-        }
-    };
+    try {
+      const data = await getStockAtTimeReport({
+        targetTime,
+        category
+      })
 
-    return (
-        <div className="report-container">
-            <h2 className="report-title">Báo Cáo & Thống Kê Tồn Kho</h2>
-            <p className="report-subtitle">Quản lý dòng chảy hàng hóa và theo dõi hiện trạng kho hàng.</p>
+      if (!data?.success) {
+        throw new Error(data?.message || 'Khong the tai bao cao ton kho.')
+      }
 
-            {/* Thanh Tabs */}
-            <div className="report-tabs">
-                <button className={`tab-btn ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>
-                    1. Tồn kho tại thời điểm
+      setStockData(Array.isArray(data.data) ? data.data : [])
+    } catch (error) {
+      const message = getErrorMessage(error)
+      console.error(error)
+      setStockData([])
+      setErrorState((prev) => ({ ...prev, stock: message }))
+
+      if (!silent) {
+        alert(message)
+      }
+    } finally {
+      setLoadingState((prev) => ({ ...prev, stock: false }))
+    }
+  }
+
+  const fetchIOReport = async ({ silent = false } = {}) => {
+    if (!startDate || !endDate) {
+      if (!silent) {
+        alert('Vui long chon day du Tu ngay va Den ngay!')
+      }
+      return
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      const message = 'Ngay bat dau khong duoc lon hon ngay ket thuc!'
+
+      setIoData([])
+      setErrorState((prev) => ({ ...prev, io: message }))
+
+      if (!silent) {
+        alert(message)
+      }
+      return
+    }
+
+    setLoadingState((prev) => ({ ...prev, io: true }))
+    setErrorState((prev) => ({ ...prev, io: '' }))
+
+    try {
+      const data = await getImportExportReport({
+        startDate,
+        endDate
+      })
+
+      if (!data?.success) {
+        throw new Error(data?.message || 'Khong the tai bao cao nhap xuat.')
+      }
+
+      setIoData(Array.isArray(data.data) ? data.data : [])
+    } catch (error) {
+      const message = getErrorMessage(error)
+      console.error(error)
+      setIoData([])
+      setErrorState((prev) => ({ ...prev, io: message }))
+
+      if (!silent) {
+        alert(message)
+      }
+    } finally {
+      setLoadingState((prev) => ({ ...prev, io: false }))
+    }
+  }
+
+  const fetchLowStock = async ({ silent = false } = {}) => {
+    if (threshold === '' || Number(threshold) < 0) {
+      if (!silent) {
+        alert('Nguong so luong khong hop le!')
+      }
+      return
+    }
+
+    setLoadingState((prev) => ({ ...prev, lowStock: true }))
+    setErrorState((prev) => ({ ...prev, lowStock: '' }))
+
+    try {
+      const data = await getLowStockReport({
+        threshold: String(threshold)
+      })
+
+      if (!data?.success) {
+        throw new Error(data?.message || 'Khong the tai canh bao ton kho.')
+      }
+
+      setLowStockData(Array.isArray(data.data) ? data.data : [])
+    } catch (error) {
+      const message = getErrorMessage(error)
+      console.error(error)
+      setLowStockData([])
+      setErrorState((prev) => ({ ...prev, lowStock: message }))
+
+      if (!silent) {
+        alert(message)
+      }
+    } finally {
+      setLoadingState((prev) => ({ ...prev, lowStock: false }))
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 1) {
+      fetchStockAtTime({ silent: true })
+      return
+    }
+
+    if (activeTab === 2) {
+      fetchIOReport({ silent: true })
+      return
+    }
+
+    fetchLowStock({ silent: true })
+  }, [activeTab])
+
+  const resetTargetTimeToNow = () => {
+    setTargetTime(getCurrentDateTimeInputValue())
+  }
+
+  const resetDateRangeToToday = () => {
+    const today = getTodayDateInputValue()
+    setStartDate(today)
+    setEndDate(today)
+  }
+
+  const renderStatus = (message, isLoading) => {
+    if (isLoading) {
+      return <p className='report-status'>Dang tai du lieu...</p>
+    }
+
+    if (message) {
+      return <p className='report-status report-status-error'>{message}</p>
+    }
+
+    return null
+  }
+
+  return (
+    <div className='report-container'>
+      <h2 className='report-title'>Bao Cao & Thong Ke Ton Kho</h2>
+      <p className='report-subtitle'>Quan ly dong chay hang hoa va theo doi hien trang kho hang.</p>
+
+      <div className='report-tabs'>
+        <button className={`tab-btn ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>
+          1. Ton kho tai thoi diem
+        </button>
+        <button className={`tab-btn ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>
+          2. Nhap / Xuat theo ky
+        </button>
+        <button className={`tab-btn ${activeTab === 3 ? 'active' : ''}`} onClick={() => setActiveTab(3)}>
+          3. Canh bao het hang
+        </button>
+      </div>
+
+      <div className='report-card'>
+        {activeTab === 1 && (
+          <div className='tab-content'>
+            <div className='filter-bar'>
+              <div className='filter-group'>
+                <label>Chon thoi diem:</label>
+                <input type='datetime-local' value={targetTime} onChange={(e) => setTargetTime(e.target.value)} />
+              </div>
+              <div className='filter-group'>
+                <label>Phan loai:</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value='all'>Tat ca san pham</option>
+                  <option value='women'>Phu nu</option>
+                  <option value='men'>Dan ong</option>
+                  <option value='kid'>Tre em</option>
+                </select>
+              </div>
+              <div className='filter-actions'>
+                <button className='btn-secondary' type='button' onClick={resetTargetTimeToNow}>
+                  Hien tai
                 </button>
-                <button className={`tab-btn ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>
-                    2. Nhập / Xuất theo kỳ
+                <button className='btn-fetch' type='button' onClick={() => fetchStockAtTime()} disabled={loadingState.stock}>
+                  {loadingState.stock ? 'Dang tai...' : 'Tra cuu'}
                 </button>
-                <button className={`tab-btn ${activeTab === 3 ? 'active' : ''}`} onClick={() => setActiveTab(3)}>
-                    3. Cảnh báo hết hàng
-                </button>
+              </div>
             </div>
 
-            <div className="report-card">
-                {/* NỘI DUNG TAB 1 */}
-                {activeTab === 1 && (
-                    <div className="tab-content">
-                        <div className="filter-bar">
-                            <div className="filter-group">
-                                <label>Chọn thời điểm:</label>
-                                <input type="datetime-local" value={targetTime} onChange={(e) => setTargetTime(e.target.value)} />
-                            </div>
-                            <div className="filter-group">
-                                <label>Phân loại:</label>
-                                <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                                    <option value="all">Tất cả sản phẩm</option>
-                                    <option value="women">Phụ nữ</option>
-                                    <option value="men">Đàn ông</option>
-                                    <option value="kid">Trẻ em</option>
-                                </select>
-                            </div>
-                            <button className="btn-fetch" onClick={fetchStockAtTime}>Tra Cứu</button>
-                        </div>
+            {renderStatus(errorState.stock, loadingState.stock)}
 
-                        <table className="report-table">
-                            <thead>
-                                <tr>
-                                    <th>Mã SP</th>
-                                    <th>Tên Sản Phẩm</th>
-                                    <th>Tổng Nhập (Đến mốc T)</th>
-                                    <th>Tổng Xuất (Đến mốc T)</th>
-                                    <th>Tồn Kho Thực Tế</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {stockData.length === 0 ? <tr><td colSpan="5" className="empty-row">Chưa có dữ liệu. Hãy chọn thời gian và bấm Tra Cứu.</td></tr> :
-                                    stockData.map((item, idx) => (
-                                        <tr key={idx}>
-                                            <td>{item.code || `SP${item.id}`}</td>
-                                            <td style={{ fontWeight: 500 }}>{item.name}</td>
-                                            <td style={{ color: '#10b981' }}>{item.total_imported}</td>
-                                            <td style={{ color: '#ef4444' }}>{item.total_sold}</td>
-                                            <td style={{ fontWeight: 'bold', color: '#3b82f6' }}>{item.stock_at_time}</td>
-                                        </tr>
-                                    ))}
-                            </tbody>
-                        </table>
-                    </div>
+            <table className='report-table'>
+              <thead>
+                <tr>
+                  <th>Ma SP</th>
+                  <th>Ten san pham</th>
+                  <th>Tong nhap</th>
+                  <th>Tong xuat</th>
+                  <th>Ton kho thuc te</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loadingState.stock && stockData.length === 0 ? (
+                  <tr>
+                    <td colSpan='5' className='empty-row'>
+                      Chua co du lieu ton kho tai moc thoi gian da chon.
+                    </td>
+                  </tr>
+                ) : (
+                  stockData.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.code || `SP${item.id}`}</td>
+                      <td style={{ fontWeight: 500 }}>{item.name}</td>
+                      <td style={{ color: '#10b981' }}>{item.total_imported}</td>
+                      <td style={{ color: '#ef4444' }}>{item.total_sold}</td>
+                      <td style={{ fontWeight: 'bold', color: '#3b82f6' }}>{item.stock_at_time}</td>
+                    </tr>
+                  ))
                 )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-                {/* NỘI DUNG TAB 2 */}
-                {activeTab === 2 && (
-                    <div className="tab-content">
-                        <div className="filter-bar">
-                            <div className="filter-group">
-                                <label>Từ ngày:</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                            </div>
-                            <div className="filter-group">
-                                <label>Đến ngày:</label>
-                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                            </div>
-                            <button className="btn-fetch" onClick={fetchIOReport}>Xem Báo Cáo</button>
-                        </div>
-
-                        <table className="report-table">
-                            <thead>
-                                <tr>
-                                    <th>Mã SP</th>
-                                    <th>Tên Sản Phẩm</th>
-                                    <th>Số lượng Nhập vào</th>
-                                    <th>Số lượng Bán ra</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {ioData.length === 0 ? <tr><td colSpan="4" className="empty-row">Chưa có dữ liệu. Hãy chọn khoảng thời gian và bấm Xem Báo Cáo.</td></tr> :
-                                    ioData.map((item, idx) => (
-                                        <tr key={idx}>
-                                            <td>{item.code || `SP${item.id}`}</td>
-                                            <td style={{ fontWeight: 500 }}>{item.name}</td>
-                                            <td style={{ fontWeight: 'bold', color: '#10b981' }}>+ {item.total_imported}</td>
-                                            <td style={{ fontWeight: 'bold', color: '#ef4444' }}>- {item.total_exported}</td>
-                                        </tr>
-                                    ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* NỘI DUNG TAB 3 */}
-                {activeTab === 3 && (
-                    <div className="tab-content">
-                        <div className="filter-bar">
-                            <div className="filter-group">
-                                <label>Cảnh báo sản phẩm có số lượng Tồn kho từ:</label>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <input
-                                        type="number"
-                                        value={threshold}
-                                        onChange={(e) => setThreshold(e.target.value)}
-                                        min="0"
-                                        style={{ width: '100px', fontWeight: 'bold' }}
-                                    />
-                                    <span>trở xuống.</span>
-                                </div>
-                            </div>
-                            <button className="btn-fetch" onClick={fetchLowStock} style={{ backgroundColor: '#f59e0b' }}>Lọc Cảnh Báo</button>
-                        </div>
-
-                        <table className="report-table">
-                            <thead>
-                                <tr>
-                                    <th>Mã SP</th>
-                                    <th>Tên Sản Phẩm</th>
-                                    <th>Tồn Kho Hiện Tại</th>
-                                    <th>Mức Cảnh Báo</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {lowStockData.length === 0 ? <tr><td colSpan="4" className="empty-row">Chưa có dữ liệu cảnh báo.</td></tr> :
-                                    lowStockData.map((item, idx) => (
-                                        <tr key={idx} style={{ backgroundColor: item.stock_quantity === 0 ? '#fee2e2' : '#fef3c7' }}>
-                                            <td>{item.code || `SP${item.id}`}</td>
-                                            <td style={{ fontWeight: 500 }}>{item.name}</td>
-                                            <td style={{ fontWeight: 'bold', color: '#dc2626', fontSize: '16px' }}>
-                                                {item.stock_quantity}
-                                                {item.stock_quantity === 0 && <span style={{ marginLeft: '10px', fontSize: '12px', padding: '3px 8px', background: '#ef4444', color: 'white', borderRadius: '12px' }}>Hết sạch hàng</span>}
-                                            </td>
-                                            <td>&le; {threshold}</td>
-                                        </tr>
-                                    ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+        {activeTab === 2 && (
+          <div className='tab-content'>
+            <div className='filter-bar'>
+              <div className='filter-group'>
+                <label>Tu ngay:</label>
+                <input type='date' value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div className='filter-group'>
+                <label>Den ngay:</label>
+                <input type='date' value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+              <div className='filter-actions'>
+                <button className='btn-secondary' type='button' onClick={resetDateRangeToToday}>
+                  Hom nay
+                </button>
+                <button className='btn-fetch' type='button' onClick={() => fetchIOReport()} disabled={loadingState.io}>
+                  {loadingState.io ? 'Dang tai...' : 'Xem bao cao'}
+                </button>
+              </div>
             </div>
-        </div>
-    );
-};
 
-export default InventoryReport;
+            {renderStatus(errorState.io, loadingState.io)}
+
+            <table className='report-table'>
+              <thead>
+                <tr>
+                  <th>Ma SP</th>
+                  <th>Ten san pham</th>
+                  <th>So luong nhap vao</th>
+                  <th>So luong ban ra</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loadingState.io && ioData.length === 0 ? (
+                  <tr>
+                    <td colSpan='4' className='empty-row'>
+                      Chua co du lieu trong khoang thoi gian da chon.
+                    </td>
+                  </tr>
+                ) : (
+                  ioData.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.code || `SP${item.id}`}</td>
+                      <td style={{ fontWeight: 500 }}>{item.name}</td>
+                      <td style={{ fontWeight: 'bold', color: '#10b981' }}>+ {item.total_imported}</td>
+                      <td style={{ fontWeight: 'bold', color: '#ef4444' }}>- {item.total_exported}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 3 && (
+          <div className='tab-content'>
+            <div className='filter-bar'>
+              <div className='filter-group'>
+                <label>Canh bao san pham co ton kho tu:</label>
+                <div className='threshold-input-row'>
+                  <input
+                    type='number'
+                    value={threshold}
+                    onChange={(e) => setThreshold(e.target.value)}
+                    min='0'
+                  />
+                  <span>tro xuong</span>
+                </div>
+              </div>
+              <div className='filter-actions'>
+                <button className='btn-fetch btn-warning' type='button' onClick={() => fetchLowStock()} disabled={loadingState.lowStock}>
+                  {loadingState.lowStock ? 'Dang tai...' : 'Loc canh bao'}
+                </button>
+              </div>
+            </div>
+
+            {renderStatus(errorState.lowStock, loadingState.lowStock)}
+
+            <table className='report-table'>
+              <thead>
+                <tr>
+                  <th>Ma SP</th>
+                  <th>Ten san pham</th>
+                  <th>Ton kho hien tai</th>
+                  <th>Muc canh bao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loadingState.lowStock && lowStockData.length === 0 ? (
+                  <tr>
+                    <td colSpan='4' className='empty-row'>
+                      Khong co san pham nao dang o muc canh bao.
+                    </td>
+                  </tr>
+                ) : (
+                  lowStockData.map((item) => (
+                    <tr key={item.id} style={{ backgroundColor: Number(item.stock_quantity) === 0 ? '#fee2e2' : '#fef3c7' }}>
+                      <td>{item.code || `SP${item.id}`}</td>
+                      <td style={{ fontWeight: 500 }}>{item.name}</td>
+                      <td style={{ fontWeight: 'bold', color: '#dc2626', fontSize: '16px' }}>
+                        {item.stock_quantity}
+                        {Number(item.stock_quantity) === 0 && (
+                          <span className='report-badge-danger'>Het sach hang</span>
+                        )}
+                      </td>
+                      <td>&le; {threshold}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default InventoryReport

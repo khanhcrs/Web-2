@@ -13,6 +13,7 @@ final class Application
     private readonly string $jwtSecret;
     private readonly string $defaultAdminEmail;
     private readonly string $uploadDirectory;
+    private readonly string $databaseDriver;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -21,7 +22,11 @@ final class Application
     ) {
         $this->jwtSecret = (string) getenv('JWT_SECRET') ?: 'secret_ecom';
         $this->defaultAdminEmail = strtolower((string) getenv('ADMIN_EMAIL') ?: 'admin@clothify.com');
-        $this->uploadDirectory = $this->basePath . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'upload' . DIRECTORY_SEPARATOR . 'images';
+        $this->uploadDirectory = $this->basePath
+            . DIRECTORY_SEPARATOR . 'storage'
+            . DIRECTORY_SEPARATOR . 'upload'
+            . DIRECTORY_SEPARATOR . 'images';
+        $this->databaseDriver = (string) $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 
     public function handle(): void
@@ -61,7 +66,8 @@ final class Application
     private function dispatch(string $method, string $path): void
     {
         if ($method === 'GET' && $path === '/') {
-            $this->respondText('PHP App is running with PostgreSQL', 200);
+            $label = $this->isMySql() ? 'MySQL' : 'PostgreSQL';
+            $this->respondText('PHP App is running with ' . $label, 200);
             return;
         }
 
@@ -141,6 +147,18 @@ final class Application
         if ($method === 'POST' && $path === '/removefromcart') {
             $this->ensureSchemaReady();
             $this->removeFromCart();
+            return;
+        }
+
+        if ($method === 'GET' && $path === '/cart') {
+            $this->ensureSchemaReady();
+            $this->getCart();
+            return;
+        }
+
+        if ($method === 'PUT' && $path === '/cart') {
+            $this->ensureSchemaReady();
+            $this->replaceCart();
             return;
         }
 
@@ -300,7 +318,7 @@ final class Application
 
         $this->respondJson([
             'success' => 1,
-            'image_url' => '/images/' . $filename,
+            'image_url' => 'images/' . $filename,
         ]);
     }
 
@@ -325,15 +343,19 @@ final class Application
         $newPrice = $importPrice * (1 + ($profitMargin / 100));
         $imagesToSave = $images !== [] ? $images : [$primaryImage];
 
-        $statement = $this->pdo->prepare(
-            <<<'SQL'
+        $imagesExpression = $this->isMySql() ? ':images' : 'CAST(:images AS jsonb)';
+        $sql = <<<SQL
 INSERT INTO products
-    (code, name, description, unit, category, stock_quantity, current_import_price, profit_margin, new_price, old_price, status, image, images)
+    (code, name, description, unit, category, stock_quantity, initial_stock_quantity, current_import_price, profit_margin, new_price, old_price, status, image, images)
 VALUES
-    (:code, :name, :description, :unit, :category, :stock_quantity, :current_import_price, :profit_margin, :new_price, :old_price, :status, :image, CAST(:images AS jsonb))
-RETURNING *
-SQL
-        );
+    (:code, :name, :description, :unit, :category, :stock_quantity, :initial_stock_quantity, :current_import_price, :profit_margin, :new_price, :old_price, :status, :image, {$imagesExpression})
+SQL;
+
+        if (!$this->isMySql()) {
+            $sql .= "\nRETURNING *";
+        }
+
+        $statement = $this->pdo->prepare($sql);
 
         try {
             $statement->execute([
@@ -343,6 +365,7 @@ SQL
                 'unit' => trim((string) ($body['unit'] ?? '')) !== '' ? trim((string) $body['unit']) : 'Cái',
                 'category' => $category,
                 'stock_quantity' => $stock,
+                'initial_stock_quantity' => $stock,
                 'current_import_price' => $importPrice,
                 'profit_margin' => $profitMargin,
                 'new_price' => $newPrice,
@@ -352,16 +375,20 @@ SQL
                 'images' => $this->jsonEncode($imagesToSave),
             ]);
         } catch (Throwable $throwable) {
-            if ($throwable->getCode() === '23505') {
+            if ($this->isUniqueConstraintViolation($throwable)) {
                 throw new HttpException(400, ['success' => false, 'message' => 'Mã sản phẩm đã tồn tại!']);
             }
 
             throw $throwable;
         }
 
+        $product = $this->isMySql()
+            ? $this->fetchOne('SELECT * FROM products WHERE id = :id LIMIT 1', ['id' => (int) $this->pdo->lastInsertId()])
+            : ($statement->fetch() ?: null);
+
         $this->respondJson([
             'success' => true,
-            'product' => $statement->fetch(),
+            'product' => $product,
         ]);
     }
 
@@ -392,27 +419,44 @@ SQL,
         );
 
         if ($hasHistory || $this->toInt($product['stock_quantity'] ?? 0) > 0) {
-            $statement = $this->pdo->prepare('UPDATE products SET status = :status WHERE id = :id RETURNING *');
+            $statement = $this->pdo->prepare(
+                $this->isMySql()
+                    ? 'UPDATE products SET status = :status WHERE id = :id'
+                    : 'UPDATE products SET status = :status WHERE id = :id RETURNING *'
+            );
             $statement->execute([
                 'status' => 'hidden',
                 'id' => $id,
             ]);
 
+            $updatedProduct = $this->isMySql()
+                ? $this->fetchOne('SELECT * FROM products WHERE id = :id LIMIT 1', ['id' => $id])
+                : ($statement->fetch() ?: null);
+
             $this->respondJson([
                 'success' => true,
                 'action' => 'hidden',
-                'product' => $statement->fetch(),
+                'product' => $updatedProduct,
             ]);
             return;
         }
 
-        $statement = $this->pdo->prepare('DELETE FROM products WHERE id = :id RETURNING *');
+        $deletedProduct = $product;
+        $statement = $this->pdo->prepare(
+            $this->isMySql()
+                ? 'DELETE FROM products WHERE id = :id'
+                : 'DELETE FROM products WHERE id = :id RETURNING *'
+        );
         $statement->execute(['id' => $id]);
+
+        if (!$this->isMySql()) {
+            $deletedProduct = $statement->fetch() ?: $deletedProduct;
+        }
 
         $this->respondJson([
             'success' => true,
             'action' => 'deleted',
-            'product' => $statement->fetch(),
+            'product' => $deletedProduct,
         ]);
     }
 
@@ -458,7 +502,7 @@ SQL,
 
         if (array_key_exists('images', $body)) {
             $images = $this->normalizeImages($body['images']);
-            $updates[] = 'images = CAST(:images AS jsonb)';
+            $updates[] = $this->isMySql() ? 'images = :images' : 'images = CAST(:images AS jsonb)';
             $updates[] = 'image = :image';
             $params['images'] = $this->jsonEncode($images);
             $params['image'] = $images[0] ?? '';
@@ -468,23 +512,30 @@ SQL,
             throw new HttpException(400, ['success' => false, 'message' => 'Không có dữ liệu cập nhật.']);
         }
 
-        $statement = $this->pdo->prepare(
-            'UPDATE products SET ' . implode(', ', $updates) . ' WHERE id = :id RETURNING *'
-        );
+        $sql = 'UPDATE products SET ' . implode(', ', $updates) . ' WHERE id = :id';
+        if (!$this->isMySql()) {
+            $sql .= ' RETURNING *';
+        }
+
+        $statement = $this->pdo->prepare($sql);
 
         try {
             $statement->execute($params);
         } catch (Throwable $throwable) {
-            if ($throwable->getCode() === '23505') {
+            if ($this->isUniqueConstraintViolation($throwable)) {
                 throw new HttpException(400, ['success' => false, 'message' => 'Mã sản phẩm đã tồn tại!']);
             }
 
             throw $throwable;
         }
 
+        $product = $this->isMySql()
+            ? $this->fetchOne('SELECT * FROM products WHERE id = :id LIMIT 1', ['id' => $id])
+            : ($statement->fetch() ?: null);
+
         $this->respondJson([
             'success' => true,
-            'product' => $statement->fetch(),
+            'product' => $product,
         ]);
     }
 
@@ -510,20 +561,28 @@ SQL,
             throw new HttpException(400, ['success' => false, 'message' => 'Email already registered.']);
         }
 
-        $statement = $this->pdo->prepare(
-            <<<'SQL'
+        $sql = <<<'SQL'
 INSERT INTO users (name, email, password, role)
 VALUES (:name, :email, :password, 'customer')
-RETURNING id, name, email, status, role, created_at
-SQL
-        );
+SQL;
+
+        if (!$this->isMySql()) {
+            $sql .= "\nRETURNING id, name, email, status, role, created_at";
+        }
+
+        $statement = $this->pdo->prepare($sql);
         $statement->execute([
             'name' => $name,
             'email' => $email,
             'password' => password_hash($password, PASSWORD_BCRYPT),
         ]);
 
-        $user = $statement->fetch();
+        $user = $this->isMySql()
+            ? $this->fetchOne(
+                'SELECT id, name, email, status, role, created_at FROM users WHERE id = :id LIMIT 1',
+                ['id' => (int) $this->pdo->lastInsertId()]
+            )
+            : ($statement->fetch() ?: null);
         $token = Jwt::encode(['id' => (int) $user['id'], 'email' => $user['email']], $this->jwtSecret);
 
         $this->respondJson([
@@ -616,20 +675,25 @@ SQL
             throw new HttpException(400, ['success' => false, 'message' => 'Cannot suspend the default administrator account.']);
         }
 
-        $statement = $this->pdo->prepare(
-            <<<'SQL'
+        $sql = <<<'SQL'
 UPDATE users
 SET status = :status
 WHERE id = :id
-RETURNING id, name, email, status, created_at
-SQL
-        );
+SQL;
+
+        if (!$this->isMySql()) {
+            $sql .= "\nRETURNING id, name, email, status, created_at";
+        }
+
+        $statement = $this->pdo->prepare($sql);
         $statement->execute([
             'status' => $status,
             'id' => $userId,
         ]);
 
-        $user = $statement->fetch();
+        $user = $this->isMySql()
+            ? $this->fetchOne('SELECT id, name, email, status, created_at FROM users WHERE id = :id LIMIT 1', ['id' => $userId])
+            : ($statement->fetch() ?: null);
         $this->respondJson([
             'success' => true,
             'user' => [
@@ -662,20 +726,28 @@ SQL
             throw new HttpException(400, ['success' => false, 'message' => 'Cannot remove admin role from the default administrator account.']);
         }
 
-        $statement = $this->pdo->prepare(
-            <<<'SQL'
+        $sql = <<<'SQL'
 UPDATE users
 SET role = :role
 WHERE id = :id
-RETURNING id, name, email, status, role, created_at
-SQL
-        );
+SQL;
+
+        if (!$this->isMySql()) {
+            $sql .= "\nRETURNING id, name, email, status, role, created_at";
+        }
+
+        $statement = $this->pdo->prepare($sql);
         $statement->execute([
             'role' => $role,
             'id' => $userId,
         ]);
 
-        $user = $statement->fetch();
+        $user = $this->isMySql()
+            ? $this->fetchOne(
+                'SELECT id, name, email, status, role, created_at FROM users WHERE id = :id LIMIT 1',
+                ['id' => $userId]
+            )
+            : ($statement->fetch() ?: null);
         $this->respondJson([
             'success' => true,
             'user' => [
@@ -709,7 +781,11 @@ SQL
         $key = $itemId . '-' . $size;
         $cartData[$key] = $this->toInt($cartData[$key] ?? 0) + 1;
 
-        $statement = $this->pdo->prepare('UPDATE users SET cart_data = CAST(:cart_data AS jsonb) WHERE id = :id');
+        $statement = $this->pdo->prepare(
+            $this->isMySql()
+                ? 'UPDATE users SET cart_data = :cart_data WHERE id = :id'
+                : 'UPDATE users SET cart_data = CAST(:cart_data AS jsonb) WHERE id = :id'
+        );
         $statement->execute([
             'cart_data' => $this->jsonEncode($cartData),
             'id' => $user['id'],
@@ -740,13 +816,55 @@ SQL
             }
         }
 
-        $statement = $this->pdo->prepare('UPDATE users SET cart_data = CAST(:cart_data AS jsonb) WHERE id = :id');
+        $statement = $this->pdo->prepare(
+            $this->isMySql()
+                ? 'UPDATE users SET cart_data = :cart_data WHERE id = :id'
+                : 'UPDATE users SET cart_data = CAST(:cart_data AS jsonb) WHERE id = :id'
+        );
         $statement->execute([
             'cart_data' => $this->jsonEncode($cartData),
             'id' => $user['id'],
         ]);
 
         $this->respondText('Removed', 200);
+    }
+
+    private function getCart(): void
+    {
+        $user = $this->requireBearerAuth();
+        $userRow = $this->fetchOne('SELECT id, cart_data FROM users WHERE id = :id LIMIT 1', ['id' => $user['id']]);
+        if ($userRow === null) {
+            throw new HttpException(404, ['success' => false, 'message' => 'User not found.']);
+        }
+
+        $cartItems = $this->sanitizeCartItems($this->decodeJsonColumn($userRow['cart_data'] ?? []) ?? []);
+
+        $this->respondJson([
+            'success' => true,
+            'cartItems' => $cartItems,
+        ]);
+    }
+
+    private function replaceCart(): void
+    {
+        $user = $this->requireBearerAuth();
+        $body = $this->requestJson();
+        $cartItems = $this->sanitizeCartItems($body['cartItems'] ?? []);
+
+        $statement = $this->pdo->prepare(
+            $this->isMySql()
+                ? 'UPDATE users SET cart_data = :cart_data WHERE id = :id'
+                : 'UPDATE users SET cart_data = CAST(:cart_data AS jsonb) WHERE id = :id'
+        );
+        $statement->execute([
+            'cart_data' => $this->jsonEncode($cartItems),
+            'id' => $user['id'],
+        ]);
+
+        $this->respondJson([
+            'success' => true,
+            'cartItems' => $cartItems,
+        ]);
     }
 
     private function getMyOrders(): void
@@ -890,6 +1008,10 @@ SQL
             $status = 'pending';
         }
 
+        if ($items === []) {
+            throw new HttpException(400, ['success' => false, 'message' => 'Order must contain at least one item.']);
+        }
+
         $this->pdo->beginTransaction();
 
         try {
@@ -905,18 +1027,24 @@ SQL
                 'address' => trim((string) ($body['shippingAddress'] ?? '')),
             ];
 
-            $statement = $this->pdo->prepare(
-                <<<'SQL'
+            $shippingExpression = $this->isMySql() ? ':shipping_address' : 'CAST(:shipping_address AS jsonb)';
+            $sql = <<<SQL
 INSERT INTO orders
     (order_id, customer_id, customer_name, customer_email, total, status, shipping_address, shipping_method, payment_method)
 VALUES
-    (:order_id, :customer_id, :customer_name, :customer_email, :total, :status, CAST(:shipping_address AS jsonb), :shipping_method, :payment_method)
-RETURNING *
-SQL
-            );
+    (:order_id, :customer_id, :customer_name, :customer_email, :total, :status, {$shippingExpression}, :shipping_method, :payment_method)
+SQL;
+
+            if (!$this->isMySql()) {
+                $sql .= "\nRETURNING *";
+            }
+
+            $statement = $this->pdo->prepare($sql);
             $statement->execute([
                 'order_id' => $nextOrderId,
-                'customer_id' => $body['customerId'] !== null ? $this->toInt($body['customerId']) : null,
+                'customer_id' => array_key_exists('customerId', $body) && $body['customerId'] !== null
+                    ? $this->toInt($body['customerId'])
+                    : null,
                 'customer_name' => trim((string) ($body['customerName'] ?? '')),
                 'customer_email' => trim((string) ($body['customerEmail'] ?? '')),
                 'total' => $this->toFloat($body['total'] ?? 0),
@@ -926,7 +1054,9 @@ SQL
                 'payment_method' => trim((string) ($body['paymentMethod'] ?? '')),
             ]);
 
-            $order = $statement->fetch();
+            $order = $this->isMySql()
+                ? $this->fetchOne('SELECT * FROM orders WHERE id = :id LIMIT 1', ['id' => (int) $this->pdo->lastInsertId()])
+                : ($statement->fetch() ?: null);
             $orderPrimaryId = (int) $order['id'];
 
             $insertItem = $this->pdo->prepare(
@@ -938,28 +1068,72 @@ VALUES
 SQL
             );
 
+            $inventoryShouldChange = $this->isInventoryAffectingOrderStatus($status);
+            $normalizedItems = [];
+
             foreach ($items as $item) {
                 if (!is_array($item)) {
                     continue;
                 }
 
+                $quantity = $this->toInt($item['quantity'] ?? 0);
+                if ($quantity <= 0) {
+                    continue;
+                }
+
                 $productId = $this->toInt($item['productId'] ?? 0);
-                $snapshot = $productId > 0 ? $this->fetchOne(
-                    'SELECT code, unit, COALESCE(image, images->>0) AS image FROM products WHERE id = :id LIMIT 1',
-                    ['id' => $productId]
-                ) : null;
+                $snapshot = null;
+
+                if ($productId > 0) {
+                    $snapshot = $this->fetchOne(
+                        'SELECT id, name, code, unit, status, stock_quantity, ' . $this->productPrimaryImageExpression() . ' AS image FROM products WHERE id = :id LIMIT 1 FOR UPDATE',
+                        ['id' => $productId]
+                    );
+
+                    if ($snapshot === null) {
+                        throw new HttpException(404, ['success' => false, 'message' => 'Product not found for this order item.']);
+                    }
+
+                    if ($inventoryShouldChange && $this->toInt($snapshot['stock_quantity'] ?? 0) < $quantity) {
+                        throw new HttpException(400, [
+                            'success' => false,
+                            'message' => sprintf('Insufficient stock for product "%s".', (string) ($snapshot['name'] ?? $item['name'] ?? '')),
+                        ]);
+                    }
+
+                    if ($inventoryShouldChange) {
+                        $updateStock = $this->pdo->prepare('UPDATE products SET stock_quantity = :stock_quantity WHERE id = :id');
+                        $updateStock->execute([
+                            'stock_quantity' => max($this->toInt($snapshot['stock_quantity'] ?? 0) - $quantity, 0),
+                            'id' => $productId,
+                        ]);
+                    }
+                }
+
+                $normalizedItem = [
+                    'productId' => $productId,
+                    'name' => trim((string) ($item['name'] ?? '')),
+                    'quantity' => $quantity,
+                    'price' => $this->toFloat($item['price'] ?? 0),
+                    'size' => trim((string) ($item['size'] ?? '')) !== '' ? trim((string) $item['size']) : null,
+                ];
+                $normalizedItems[] = $normalizedItem;
 
                 $insertItem->execute([
                     'order_id' => $orderPrimaryId,
                     'product_id' => $productId > 0 ? $productId : null,
-                    'name' => trim((string) ($item['name'] ?? '')),
-                    'quantity' => $this->toInt($item['quantity'] ?? 0),
-                    'price' => $this->toFloat($item['price'] ?? 0),
-                    'size' => trim((string) ($item['size'] ?? '')) !== '' ? trim((string) $item['size']) : null,
+                    'name' => $normalizedItem['name'],
+                    'quantity' => $normalizedItem['quantity'],
+                    'price' => $normalizedItem['price'],
+                    'size' => $normalizedItem['size'],
                     'image' => $snapshot['image'] ?? null,
                     'code' => $snapshot['code'] ?? null,
                     'unit' => $snapshot['unit'] ?? 'Cái',
                 ]);
+            }
+
+            if ($normalizedItems === []) {
+                throw new HttpException(400, ['success' => false, 'message' => 'Order must contain at least one valid item.']);
             }
 
             $this->pdo->commit();
@@ -972,12 +1146,12 @@ SQL
                     'customerName' => $order['customer_name'],
                     'customerEmail' => $order['customer_email'],
                     'items' => array_map(fn(array $item): array => [
-                        'productId' => $this->toInt($item['productId'] ?? 0),
-                        'name' => trim((string) ($item['name'] ?? '')),
-                        'quantity' => $this->toInt($item['quantity'] ?? 0),
-                        'price' => $this->toFloat($item['price'] ?? 0),
-                        'size' => trim((string) ($item['size'] ?? '')) !== '' ? trim((string) $item['size']) : null,
-                    ], array_values(array_filter($items, 'is_array'))),
+                        'productId' => $item['productId'],
+                        'name' => $item['name'],
+                        'quantity' => $item['quantity'],
+                        'price' => $item['price'],
+                        'size' => $item['size'],
+                    ], $normalizedItems),
                     'total' => $this->toFloat($order['total']),
                     'status' => $order['status'],
                     'shippingAddress' => $shippingAddress['address'],
@@ -1004,34 +1178,61 @@ SQL
             throw new HttpException(400, ['success' => false, 'message' => 'Invalid order status.']);
         }
 
-        $statement = $this->pdo->prepare('UPDATE orders SET status = :status WHERE order_id = :order_id RETURNING id');
-        $statement->execute([
-            'status' => $status,
-            'order_id' => $orderId,
-        ]);
-        $updated = $statement->fetch();
+        $this->pdo->beginTransaction();
 
-        if ($updated === false) {
-            throw new HttpException(404, ['success' => false, 'message' => 'Order not found.']);
-        }
+        try {
+            $orderRow = $this->fetchOne(
+                'SELECT id, status FROM orders WHERE order_id = :order_id LIMIT 1 FOR UPDATE',
+                ['order_id' => $orderId]
+            );
 
-        $order = $this->fetchOne(
-            <<<'SQL'
+            if ($orderRow === null) {
+                throw new HttpException(404, ['success' => false, 'message' => 'Order not found.']);
+            }
+
+            $orderPrimaryId = (int) $orderRow['id'];
+            $previousStatus = strtolower((string) ($orderRow['status'] ?? 'pending'));
+            $items = $this->fetchOrderItemsByParentIds([$orderPrimaryId])[$orderPrimaryId] ?? [];
+
+            if ($previousStatus !== $status) {
+                $wasAffectingInventory = $this->isInventoryAffectingOrderStatus($previousStatus);
+                $isAffectingInventory = $this->isInventoryAffectingOrderStatus($status);
+
+                if ($wasAffectingInventory !== $isAffectingInventory) {
+                    $this->adjustInventoryForOrderItems($items, $isAffectingInventory ? 'deduct' : 'restore');
+                }
+            }
+
+            $statement = $this->pdo->prepare('UPDATE orders SET status = :status WHERE order_id = :order_id');
+            $statement->execute([
+                'status' => $status,
+                'order_id' => $orderId,
+            ]);
+
+            $order = $this->fetchOne(
+                <<<'SQL'
 SELECT o.*, u.name AS user_name, u.email AS user_email, u.status AS user_status
 FROM orders o
 LEFT JOIN users u ON o.customer_id = u.id
 WHERE o.id = :id
 LIMIT 1
 SQL,
-            ['id' => $updated['id']]
-        );
+                ['id' => $orderPrimaryId]
+            );
 
-        $items = $this->fetchOrderItemsByParentIds([(int) $updated['id']])[(int) $updated['id']] ?? [];
+            $this->pdo->commit();
 
-        $this->respondJson([
-            'success' => true,
-            'order' => $this->formatOrderResponse($order, $items),
-        ]);
+            $this->respondJson([
+                'success' => true,
+                'order' => $this->formatOrderResponse($order, $items),
+            ]);
+        } catch (Throwable $throwable) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $throwable;
+        }
     }
 
     private function addReview(): void
@@ -1039,13 +1240,16 @@ SQL,
         $user = $this->requireAuthTokenHeader();
         $body = $this->requestJson();
 
-        $statement = $this->pdo->prepare(
-            <<<'SQL'
+        $sql = <<<'SQL'
 INSERT INTO reviews (product_id, user_id, user_name, rating, comment)
 VALUES (:product_id, :user_id, :user_name, :rating, :comment)
-RETURNING *
-SQL
-        );
+SQL;
+
+        if (!$this->isMySql()) {
+            $sql .= "\nRETURNING *";
+        }
+
+        $statement = $this->pdo->prepare($sql);
 
         $userRow = $this->fetchOne('SELECT name FROM users WHERE id = :id LIMIT 1', ['id' => $user['id']]);
         if ($userRow === null) {
@@ -1060,9 +1264,13 @@ SQL
             'comment' => trim((string) ($body['comment'] ?? '')),
         ]);
 
+        $review = $this->isMySql()
+            ? $this->fetchOne('SELECT * FROM reviews WHERE id = :id LIMIT 1', ['id' => (int) $this->pdo->lastInsertId()])
+            : ($statement->fetch() ?: null);
+
         $this->respondJson([
             'success' => true,
-            'review' => $statement->fetch(),
+            'review' => $review,
         ]);
     }
 
@@ -1099,14 +1307,19 @@ SQL
         $this->pdo->beginTransaction();
 
         try {
-            $statement = $this->pdo->prepare(
-                'INSERT INTO import_receipts (receipt_code, status) VALUES (:receipt_code, :status) RETURNING *'
-            );
+            $sql = 'INSERT INTO import_receipts (receipt_code, status) VALUES (:receipt_code, :status)';
+            if (!$this->isMySql()) {
+                $sql .= ' RETURNING *';
+            }
+
+            $statement = $this->pdo->prepare($sql);
             $statement->execute([
                 'receipt_code' => $receiptCode,
                 'status' => 'pending',
             ]);
-            $receipt = $statement->fetch();
+            $receipt = $this->isMySql()
+                ? $this->fetchOne('SELECT * FROM import_receipts WHERE id = :id LIMIT 1', ['id' => (int) $this->pdo->lastInsertId()])
+                : ($statement->fetch() ?: null);
 
             $detailStatement = $this->pdo->prepare(
                 'INSERT INTO import_receipt_details (receipt_id, product_id, import_price, quantity) VALUES (:receipt_id, :product_id, :import_price, :quantity)'
@@ -1335,7 +1548,7 @@ SQL
 
     private function getStockAtTime(): void
     {
-        $targetTime = trim((string) ($_GET['targetTime'] ?? ''));
+        $targetTime = $this->normalizeDateTimeInput((string) ($_GET['targetTime'] ?? ''));
         $category = trim((string) ($_GET['category'] ?? ''));
 
         if ($targetTime === '') {
@@ -1344,19 +1557,27 @@ SQL
 
         $sql = <<<'SQL'
 SELECT p.id, p.code, p.name, p.category,
-       COALESCE((
+       (
+           CASE
+               WHEN p.date <= :target_time THEN COALESCE(p.initial_stock_quantity, 0)
+               ELSE 0
+           END
+           +
+           COALESCE((
            SELECT SUM(ird.quantity)
            FROM import_receipt_details ird
            JOIN import_receipts ir ON ird.receipt_id = ir.id
            WHERE ird.product_id = p.id
              AND ir.status = 'completed'
              AND ir.created_at <= :target_time
-       ), 0) AS total_imported,
+       ), 0)
+       ) AS total_imported,
        COALESCE((
            SELECT SUM(oi.quantity)
            FROM order_items oi
            JOIN orders o ON oi.order_id = o.id
            WHERE oi.product_id = p.id
+             AND o.status <> 'cancelled'
              AND o.created_at <= :target_time
        ), 0) AS total_sold
 FROM products p
@@ -1391,8 +1612,8 @@ SQL;
 
     private function getImportExportReport(): void
     {
-        $startDate = trim((string) ($_GET['startDate'] ?? ''));
-        $endDate = trim((string) ($_GET['endDate'] ?? ''));
+        $startDate = $this->normalizeDateTimeInput((string) ($_GET['startDate'] ?? ''), false);
+        $endDate = $this->normalizeDateTimeInput((string) ($_GET['endDate'] ?? ''), true);
         if ($startDate === '' || $endDate === '') {
             throw new HttpException(400, ['success' => false, 'message' => 'Thiếu khoảng thời gian']);
         }
@@ -1400,7 +1621,13 @@ SQL;
         $statement = $this->pdo->prepare(
             <<<'SQL'
 SELECT p.id, p.code, p.name,
-       COALESCE((
+       (
+           CASE
+               WHEN p.date >= :start_date AND p.date <= :end_date THEN COALESCE(p.initial_stock_quantity, 0)
+               ELSE 0
+           END
+           +
+           COALESCE((
            SELECT SUM(ird.quantity)
            FROM import_receipt_details ird
            JOIN import_receipts ir ON ird.receipt_id = ir.id
@@ -1408,12 +1635,14 @@ SELECT p.id, p.code, p.name,
              AND ir.status = 'completed'
              AND ir.created_at >= :start_date
              AND ir.created_at <= :end_date
-       ), 0) AS total_imported,
+       ), 0)
+       ) AS total_imported,
        COALESCE((
            SELECT SUM(oi.quantity)
            FROM order_items oi
            JOIN orders o ON oi.order_id = o.id
            WHERE oi.product_id = p.id
+             AND o.status <> 'cancelled'
              AND o.created_at >= :start_date
              AND o.created_at <= :end_date
        ), 0) AS total_exported
@@ -1515,7 +1744,7 @@ SQL
             sprintf(
                 <<<'SQL'
 SELECT oi.*,
-       COALESCE(oi.image, p.image, p.images->>0) AS resolved_image,
+       COALESCE(oi.image, %s) AS resolved_image,
        COALESCE(oi.code, p.code) AS resolved_code,
        COALESCE(oi.unit, p.unit, 'Cái') AS resolved_unit
 FROM order_items oi
@@ -1523,6 +1752,7 @@ LEFT JOIN products p ON oi.product_id = p.id
 WHERE oi.order_id IN (%s)
 ORDER BY oi.id ASC
 SQL,
+                $this->productPrimaryImageExpression('p'),
                 implode(', ', $placeholders)
             )
         );
@@ -1539,7 +1769,7 @@ SQL,
 
     private function requireAuthTokenHeader(): array
     {
-        $token = trim((string) ($_SERVER['HTTP_AUTH_TOKEN'] ?? ''));
+        $token = $this->getRequestHeaderValue('auth-token');
         if ($token === '') {
             throw new HttpException(401, ['error' => 'No token, authorization denied']);
         }
@@ -1553,7 +1783,7 @@ SQL,
 
     private function requireBearerAuth(): array
     {
-        $authorizationHeader = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
+        $authorizationHeader = $this->getRequestHeaderValue('Authorization');
         if ($authorizationHeader === '' || !str_starts_with($authorizationHeader, 'Bearer ')) {
             throw new HttpException(401, ['success' => false, 'message' => 'Access denied. No token provided.']);
         }
@@ -1594,6 +1824,139 @@ SQL,
         }
 
         return $payload;
+    }
+
+    private function isInventoryAffectingOrderStatus(string $status): bool
+    {
+        return strtolower(trim($status)) !== 'cancelled';
+    }
+
+    private function adjustInventoryForOrderItems(array $items, string $mode): void
+    {
+        $inventoryDeltaByProduct = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $productId = $this->toInt($item['product_id'] ?? 0);
+            $quantity = $this->toInt($item['quantity'] ?? 0);
+
+            if ($productId <= 0 || $quantity <= 0) {
+                continue;
+            }
+
+            if (!array_key_exists($productId, $inventoryDeltaByProduct)) {
+                $inventoryDeltaByProduct[$productId] = [
+                    'quantity' => 0,
+                    'name' => trim((string) ($item['name'] ?? '')) !== '' ? trim((string) $item['name']) : ('Product #' . $productId),
+                ];
+            }
+
+            $inventoryDeltaByProduct[$productId]['quantity'] += $quantity;
+        }
+
+        foreach ($inventoryDeltaByProduct as $productId => $inventoryChange) {
+            $product = $this->fetchOne(
+                'SELECT id, name, stock_quantity FROM products WHERE id = :id LIMIT 1 FOR UPDATE',
+                ['id' => $productId]
+            );
+
+            if ($product === null) {
+                continue;
+            }
+
+            $currentStock = $this->toInt($product['stock_quantity'] ?? 0);
+            $quantity = $this->toInt($inventoryChange['quantity'] ?? 0);
+            $nextStock = $mode === 'restore'
+                ? $currentStock + $quantity
+                : $currentStock - $quantity;
+
+            if ($mode === 'deduct' && $nextStock < 0) {
+                throw new HttpException(400, [
+                    'success' => false,
+                    'message' => sprintf('Insufficient stock for product "%s".', (string) ($product['name'] ?? $inventoryChange['name'] ?? ('Product #' . $productId))),
+                ]);
+            }
+
+            $statement = $this->pdo->prepare('UPDATE products SET stock_quantity = :stock_quantity WHERE id = :id');
+            $statement->execute([
+                'stock_quantity' => max($nextStock, 0),
+                'id' => $productId,
+            ]);
+        }
+    }
+
+    private function normalizeDateTimeInput(string $value, bool $endOfDay = false): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+            return $value . ($endOfDay ? ' 23:59:59' : ' 00:00:00');
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}$/', $value) === 1) {
+            return str_replace('T', ' ', $value) . ':00';
+        }
+
+        return str_replace('T', ' ', $value);
+    }
+
+    private function getRequestHeaderValue(string $headerName): string
+    {
+        $normalizedHeader = strtoupper(str_replace('-', '_', $headerName));
+        $serverKey = 'HTTP_' . $normalizedHeader;
+        $fallbackKeys = [
+            $serverKey,
+            'REDIRECT_' . $serverKey,
+            $normalizedHeader,
+            $headerName,
+        ];
+
+        foreach ($fallbackKeys as $key) {
+            $value = $_SERVER[$key] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        foreach ([$this->getAllRequestHeaders(), $this->getApacheRequestHeaders()] as $headers) {
+            foreach ($headers as $name => $value) {
+                if (strcasecmp((string) $name, $headerName) !== 0) {
+                    continue;
+                }
+
+                if (is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function getAllRequestHeaders(): array
+    {
+        if (!function_exists('getallheaders')) {
+            return [];
+        }
+
+        $headers = getallheaders();
+        return is_array($headers) ? $headers : [];
+    }
+
+    private function getApacheRequestHeaders(): array
+    {
+        if (!function_exists('apache_request_headers')) {
+            return [];
+        }
+
+        $headers = apache_request_headers();
+        return is_array($headers) ? $headers : [];
     }
 
     private function requestJson(): array
@@ -1665,6 +2028,30 @@ SQL,
         return array_values(array_unique($filtered));
     }
 
+    private function sanitizeCartItems(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $sanitized = [];
+
+        foreach ($value as $key => $quantity) {
+            if (!is_string($key) || trim($key) === '') {
+                continue;
+            }
+
+            $normalizedQuantity = $this->toInt($quantity);
+            if ($normalizedQuantity <= 0) {
+                continue;
+            }
+
+            $sanitized[trim($key)] = $normalizedQuantity;
+        }
+
+        return $sanitized;
+    }
+
     private function respondJson(array $payload, int $statusCode = 200): void
     {
         http_response_code($statusCode);
@@ -1682,16 +2069,8 @@ SQL,
     private function sendCorsHeaders(): void
     {
         $origin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
-        $allowedOrigins = [
-            'http://127.0.0.1:3000',
-            'http://localhost:3000',
-            'http://127.0.0.1:5173',
-            'http://localhost:5173',
-            'http://127.0.0.1:8000',
-            'http://localhost:8000',
-        ];
 
-        if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+        if ($origin !== '') {
             header('Access-Control-Allow-Origin: ' . $origin);
         } else {
             header('Access-Control-Allow-Origin: *');
@@ -1700,6 +2079,33 @@ SQL,
         header('Vary: Origin');
         header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, auth-token');
         header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    }
+
+    private function isMySql(): bool
+    {
+        return $this->databaseDriver === 'mysql';
+    }
+
+    private function productPrimaryImageExpression(string $tableAlias = ''): string
+    {
+        $prefix = $tableAlias !== '' ? $tableAlias . '.' : '';
+
+        if ($this->isMySql()) {
+            return sprintf(
+                "COALESCE(%simage, JSON_UNQUOTE(JSON_EXTRACT(%simages, '$[0]')))",
+                $prefix,
+                $prefix
+            );
+        }
+
+        return sprintf('COALESCE(%simage, %simages->>0)', $prefix, $prefix);
+    }
+
+    private function isUniqueConstraintViolation(Throwable $throwable): bool
+    {
+        $code = (string) $throwable->getCode();
+
+        return $code === '23505' || $code === '23000';
     }
 
     private function toInt(mixed $value): int

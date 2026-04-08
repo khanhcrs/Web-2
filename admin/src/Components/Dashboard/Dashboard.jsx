@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import './Dashboard.css'
-import { API_BASE_URL } from '../../config'
-import { adminFetch } from '../../lib/adminApi'
+import { listOrders } from '../../services/orderService'
+import { listUsers } from '../../services/userService'
 
 const formatCurrency = (amount) => {
   const numeric = typeof amount === 'number' ? amount : Number(amount) || 0
@@ -16,9 +16,6 @@ const normalizeDate = (value) => {
   return date && !Number.isNaN(date.getTime()) ? date : null
 }
 
-const computeTotalsFromItems = (items = []) =>
-  items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0)
-
 const Dashboard = () => {
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
@@ -26,37 +23,40 @@ const Dashboard = () => {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let ignore = false
+
     const fetchData = async () => {
       setLoading(true)
       setError('')
+
       try {
-        const [ordersResp, usersResp] = await Promise.all([
-          adminFetch(`${API_BASE_URL}/orders`),
-          adminFetch(`${API_BASE_URL}/users`)
+        const [orderData, userData] = await Promise.all([
+          listOrders(),
+          listUsers()
         ])
 
-        const ordersData = await ordersResp.json()
-        if (!ordersResp.ok || !ordersData.success) {
-          throw new Error(ordersData.message || 'Không thể tải đơn hàng')
+        if (!ignore) {
+          setOrders(orderData)
+          setUsers(userData)
         }
-
-        const usersData = await usersResp.json()
-        if (!usersResp.ok || !usersData.success) {
-          throw new Error(usersData.message || 'Không thể tải khách hàng')
+      } catch (fetchError) {
+        if (!ignore) {
+          setError(fetchError.message || 'Khong the tai du lieu tong quan.')
+          setOrders([])
+          setUsers([])
         }
-
-        setOrders(Array.isArray(ordersData.orders) ? ordersData.orders : [])
-        setUsers(Array.isArray(usersData.users) ? usersData.users : [])
-      } catch (err) {
-        setError(err.message)
-        setOrders([])
-        setUsers([])
       } finally {
-        setLoading(false)
+        if (!ignore) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
+
+    return () => {
+      ignore = true
+    }
   }, [])
 
   const now = useMemo(() => new Date(), [])
@@ -73,67 +73,74 @@ const Dashboard = () => {
 
     const productMap = new Map()
 
-    for (const order of orders) {
+    orders.forEach((order) => {
       const createdAt = normalizeDate(order.createdAt)
-      const total = Number(order.total)
-      const resolvedTotal = Number.isNaN(total)
-        ? computeTotalsFromItems(order.items)
-        : total
+      const isCancelled = order.status === 'cancelled'
+      const orderTotal = Number(order.total) || 0
 
       totalOrders += 1
+
       if (['pending', 'processing'].includes(order.status)) {
         needingAction += 1
       }
 
-      if (createdAt) {
+      if (!isCancelled && createdAt) {
         if (createdAt >= startOfToday) {
-          revenue.today += resolvedTotal
+          revenue.today += orderTotal
         }
+
         if (createdAt >= startOfMonth) {
-          revenue.month += resolvedTotal
+          revenue.month += orderTotal
         }
       }
 
-      if (Array.isArray(order.items)) {
-        for (const item of order.items) {
-          const key = item.productId || item.name || `${order.orderId}-${Math.random()}`
-          if (!productMap.has(key)) {
-            productMap.set(key, {
-              name: item.name || `Sản phẩm #${item.productId || productMap.size + 1}`,
-              quantity: 0,
-              revenue: 0
-            })
-          }
-          const current = productMap.get(key)
-          const qty = Number(item.quantity) || 0
-          const price = Number(item.price) || 0
-          current.quantity += qty
-          current.revenue += qty * price
-        }
+      if (isCancelled || !Array.isArray(order.items)) {
+        return
       }
-    }
+
+      order.items.forEach((item, index) => {
+        const key = item.productId || item.code || `${order.orderId}-${index}`
+
+        if (!productMap.has(key)) {
+          productMap.set(key, {
+            name: item.name || `San pham #${item.productId || productMap.size + 1}`,
+            quantity: 0,
+            revenue: 0
+          })
+        }
+
+        const current = productMap.get(key)
+        const quantity = Number(item.quantity) || 0
+        const price = Number(item.price) || 0
+
+        current.quantity += quantity
+        current.revenue += quantity * price
+      })
+    })
 
     const bestSellers = Array.from(productMap.values())
-      .sort((a, b) => b.quantity - a.quantity)
+      .sort((left, right) => right.quantity - left.quantity)
       .slice(0, 5)
 
-    const newUsers = { today: 0, month: 0, latest: [] }
-
     const latestUsers = [...users]
-      .map((user) => ({ ...user, createdAt: normalizeDate(user.createdAt) }))
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
+      .map((user) => ({ ...user, normalizedCreatedAt: normalizeDate(user.createdAt) }))
+      .sort((left, right) => (right.normalizedCreatedAt?.getTime() || 0) - (left.normalizedCreatedAt?.getTime() || 0))
 
-    for (const user of latestUsers) {
-      if (!user.createdAt) continue
-      if (user.createdAt >= startOfToday) {
+    const newUsers = { today: 0, month: 0, latest: latestUsers.slice(0, 6) }
+
+    latestUsers.forEach((user) => {
+      if (!user.normalizedCreatedAt) {
+        return
+      }
+
+      if (user.normalizedCreatedAt >= startOfToday) {
         newUsers.today += 1
       }
-      if (user.createdAt >= startOfMonth) {
+
+      if (user.normalizedCreatedAt >= startOfMonth) {
         newUsers.month += 1
       }
-    }
-
-    newUsers.latest = latestUsers.slice(0, 6)
+    })
 
     return {
       revenue,
@@ -142,39 +149,39 @@ const Dashboard = () => {
       bestSellers,
       newUsers
     }
-  }, [orders, users, now])
+  }, [now, orders, users])
 
   return (
     <div className='dashboard'>
       <div className='dashboard-header'>
         <div>
-          <p className='eyebrow'>Tổng quan</p>
-          <h1>Bảng điều khiển</h1>
-          <p className='subtitle'>Nắm nhanh doanh thu, đơn hàng, sản phẩm và người dùng mới.</p>
+          <p className='eyebrow'>Tong quan</p>
+          <h1>Bang dieu khien</h1>
+          <p className='subtitle'>Nam nhanh doanh thu, don hang, san pham va nguoi dung moi.</p>
         </div>
-        {loading && <span className='tag'>Đang tải...</span>}
+        {loading && <span className='tag'>Dang tai...</span>}
       </div>
 
       {error && <div className='dashboard-alert error'>{error}</div>}
 
       <section className='dashboard-grid'>
         <article className='stat-card'>
-          <p>Doanh thu hôm nay</p>
+          <p>Doanh thu hom nay</p>
           <h2>{formatCurrency(metrics.revenue.today)}</h2>
-          <span className='badge neutral'>Cập nhật theo đơn tạo hôm nay</span>
+          <span className='badge neutral'>Khong tinh don da huy</span>
         </article>
         <article className='stat-card'>
-          <p>Doanh thu tháng này</p>
+          <p>Doanh thu thang nay</p>
           <h2>{formatCurrency(metrics.revenue.month)}</h2>
-          <span className='badge neutral'>Từ đầu tháng</span>
+          <span className='badge neutral'>Khong tinh don da huy</span>
         </article>
         <article className='stat-card'>
-          <p>Tổng số đơn</p>
+          <p>Tong so don</p>
           <h2>{metrics.totalOrders}</h2>
-          <span className='badge accent'>Đơn đã ghi nhận</span>
+          <span className='badge accent'>Don da ghi nhan</span>
         </article>
         <article className='stat-card'>
-          <p>Đơn cần xử lý</p>
+          <p>Don can xu ly</p>
           <h2>{metrics.needingAction}</h2>
           <span className='badge warning'>Pending / Processing</span>
         </article>
@@ -184,19 +191,19 @@ const Dashboard = () => {
         <article className='panel'>
           <div className='panel-header'>
             <div>
-              <p className='eyebrow'>Bán chạy</p>
-              <h3>Sản phẩm được mua nhiều</h3>
+              <p className='eyebrow'>Ban chay</p>
+              <h3>San pham duoc mua nhieu</h3>
             </div>
-            <span className='tag'>{metrics.bestSellers.length} sản phẩm</span>
+            <span className='tag'>{metrics.bestSellers.length} san pham</span>
           </div>
           {metrics.bestSellers.length === 0 ? (
-            <p className='empty'>Chưa có dữ liệu bán hàng.</p>
+            <p className='empty'>Chua co du lieu ban hang.</p>
           ) : (
             <table className='data-table'>
               <thead>
                 <tr>
-                  <th>Sản phẩm</th>
-                  <th>Đã bán</th>
+                  <th>San pham</th>
+                  <th>Da ban</th>
                   <th>Doanh thu</th>
                 </tr>
               </thead>
@@ -216,16 +223,16 @@ const Dashboard = () => {
         <article className='panel'>
           <div className='panel-header'>
             <div>
-              <p className='eyebrow'>Người dùng mới</p>
-              <h3>Tăng trưởng khách hàng</h3>
+              <p className='eyebrow'>Nguoi dung moi</p>
+              <h3>Tang truong khach hang</h3>
             </div>
             <div className='tag-group'>
-              <span className='tag'>{metrics.newUsers.today} hôm nay</span>
-              <span className='tag neutral'>{metrics.newUsers.month} tháng này</span>
+              <span className='tag'>{metrics.newUsers.today} hom nay</span>
+              <span className='tag neutral'>{metrics.newUsers.month} thang nay</span>
             </div>
           </div>
           {metrics.newUsers.latest.length === 0 ? (
-            <p className='empty'>Chưa có người dùng mới.</p>
+            <p className='empty'>Chua co nguoi dung moi.</p>
           ) : (
             <div className='user-list'>
               {metrics.newUsers.latest.map((user, index) => (
@@ -236,12 +243,12 @@ const Dashboard = () => {
                   </div>
                   <div className='user-meta'>
                     <span className={`status-pill status-${user.status || 'active'}`}>
-                      {user.status === 'suspended' ? 'Bị khoá' : 'Hoạt động'}
+                      {user.status === 'suspended' ? 'Bi khoa' : 'Hoat dong'}
                     </span>
                     <span className='user-date'>
                       {user.createdAt
                         ? new Date(user.createdAt).toLocaleDateString('vi-VN')
-                        : 'Không rõ'}
+                        : 'Khong ro'}
                     </span>
                   </div>
                 </div>

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { API_BASE_URL } from '../../config'
-import { clearAdminSession, isAdminSessionValid, saveAdminSession } from '../../lib/adminAuth'
 import './AdminLogin.css'
+import { clearAdminSession, isAdminSessionValid, saveAdminSession } from '../../lib/adminAuth'
+import { loginAdmin } from '../../services/authService'
 
 const decodeUserParam = (rawUser) => {
   if (!rawUser) {
@@ -27,6 +27,7 @@ const AdminLogin = () => {
     if (location.state?.from && typeof location.state.from === 'string') {
       return location.state.from
     }
+
     return '/'
   }, [location.state])
 
@@ -57,19 +58,7 @@ const AdminLogin = () => {
     setError('')
 
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(form)
-      })
-
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Dang nhap that bai.')
-      }
+      const data = await loginAdmin(form)
 
       if (data.user?.role !== 'admin') {
         clearAdminSession()

@@ -9,7 +9,7 @@ const RequireAdminRoute = ({ children }) => {
   const location = useLocation()
 
   if (!isAdminSessionValid()) {
-    return <Navigate to='/login' replace state={{ from: location.pathname }} />
+    return <Navigate to='../login' relative='path' replace state={{ from: location.pathname }} />
   }
 
   return children
@@ -21,7 +21,7 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     clearAdminSession()
-    navigate('/login', { replace: true })
+    navigate('../login', { relative: 'path', replace: true })
   }
 
   return (
@@ -35,9 +35,9 @@ const AdminLayout = () => {
 const App = () => {
   return (
     <Routes>
-      <Route path='/login' element={<AdminLogin />} />
+      <Route path='login' element={<AdminLogin />} />
       <Route
-        path='/*'
+        path='*'
         element={
           <RequireAdminRoute>
             <AdminLayout />

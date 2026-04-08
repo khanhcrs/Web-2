@@ -1,19 +1,27 @@
 import React, { useEffect, useState } from 'react'
 import './CustomerManagement.css'
-import { API_BASE_URL } from '../../config'
-import { adminFetch } from '../../lib/adminApi'
+import { listUsers, updateUserRole, updateUserStatus } from '../../services/userService'
 
 const statusDictionary = {
-  active: 'Hoạt động',
-  suspended: 'Bị khoá'
+  active: 'Hoat dong',
+  suspended: 'Bi khoa'
 }
 
 const roleDictionary = {
-  admin: 'Quản trị viên',
-  customer: 'Khách hàng'
+  admin: 'Quan tri vien',
+  customer: 'Khach hang'
 }
 
 const DEFAULT_ADMIN_EMAIL = 'admin@clothify.com'
+
+const mapUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  status: user.status,
+  role: user.role || 'customer',
+  createdAt: user.createdAt
+})
 
 const CustomerManagement = () => {
   const [customers, setCustomers] = useState([])
@@ -25,25 +33,12 @@ const CustomerManagement = () => {
   const fetchCustomers = async () => {
     setLoading(true)
     setError('')
+
     try {
-      const response = await adminFetch(`${API_BASE_URL}/users`)
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Không thể tải khách hàng.')
-      }
-      const mapped = Array.isArray(data.users)
-        ? data.users.map((user) => ({
-            id: user._id || user.id,
-            name: user.name,
-            email: user.email,
-            status: user.status,
-            role: user.role || 'customer',
-            createdAt: user.createdAt
-          }))
-        : []
-      setCustomers(mapped)
-    } catch (err) {
-      setError(err.message)
+      const users = await listUsers()
+      setCustomers(users.map(mapUser))
+    } catch (fetchError) {
+      setError(fetchError.message || 'Khong the tai danh sach khach hang.')
       setCustomers([])
     } finally {
       setLoading(false)
@@ -54,9 +49,9 @@ const CustomerManagement = () => {
     fetchCustomers()
   }, [])
 
-  const updateRole = async (customer, nextRole) => {
+  const handleUpdateRole = async (customer, nextRole) => {
     if (nextRole === customer.role) {
-      setFeedback('Vai trò đã được thiết lập như hiện tại.')
+      setFeedback('Vai tro da duoc thiet lap nhu hien tai.')
       return
     }
 
@@ -65,59 +60,37 @@ const CustomerManagement = () => {
     setFeedback('')
 
     try {
-      const response = await adminFetch(`${API_BASE_URL}/users/${customer.id}/role`, {
-        method: 'PATCH',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ role: nextRole })
-      })
-
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Không thể cập nhật vai trò tài khoản.')
-      }
-
-      setFeedback('Đã cập nhật vai trò khách hàng.')
+      const data = await updateUserRole(customer.id, nextRole)
       setCustomers((prev) =>
         prev.map((item) =>
-          item.id === customer.id ? { ...item, role: nextRole } : item
+          item.id === customer.id ? { ...item, role: data.user.role || nextRole } : item
         )
       )
-    } catch (err) {
-      setError(err.message)
+      setFeedback('Da cap nhat vai tro khach hang.')
+    } catch (updateError) {
+      setError(updateError.message || 'Khong the cap nhat vai tro tai khoan.')
     } finally {
       setUpdatingId(null)
     }
   }
 
-  const toggleStatus = async (customer) => {
+  const handleToggleStatus = async (customer) => {
     const nextStatus = customer.status === 'active' ? 'suspended' : 'active'
+
     setUpdatingId(customer.id)
     setError('')
     setFeedback('')
+
     try {
-      const response = await adminFetch(`${API_BASE_URL}/users/${customer.id}/status`, {
-        method: 'PATCH',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: nextStatus })
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Không thể cập nhật trạng thái tài khoản.')
-      }
-      setFeedback('Đã cập nhật trạng thái khách hàng.')
+      const data = await updateUserStatus(customer.id, nextStatus)
       setCustomers((prev) =>
         prev.map((item) =>
-          item.id === customer.id ? { ...item, status: nextStatus } : item
+          item.id === customer.id ? { ...item, status: data.user.status || nextStatus } : item
         )
       )
-    } catch (err) {
-      setError(err.message)
+      setFeedback('Da cap nhat trang thai khach hang.')
+    } catch (updateError) {
+      setError(updateError.message || 'Khong the cap nhat trang thai tai khoan.')
     } finally {
       setUpdatingId(null)
     }
@@ -127,84 +100,87 @@ const CustomerManagement = () => {
     <section className='customer-management'>
       <div className='customer-management-header'>
         <div>
-          <h2>Quản lý khách hàng</h2>
-          <p>Theo dõi tài khoản đăng ký từ trang người dùng.</p>
+          <h2>Quan ly khach hang</h2>
+          <p>Theo doi tai khoan dang ky tu trang nguoi dung.</p>
         </div>
         <button type='button' onClick={fetchCustomers} disabled={loading}>
-          {loading ? 'Đang tải...' : 'Tải lại'}
+          {loading ? 'Dang tai...' : 'Tai lai'}
         </button>
       </div>
+
       {error && <div className='customer-management-alert error'>{error}</div>}
       {feedback && <div className='customer-management-alert success'>{feedback}</div>}
+
       <div className='customer-table-wrapper'>
         <table className='customer-table'>
           <thead>
             <tr>
-              <th>Khách hàng</th>
+              <th>Khach hang</th>
               <th>Email</th>
-              <th>Ngày tạo</th>
-              <th>Vai trò</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
+              <th>Ngay tao</th>
+              <th>Vai tro</th>
+              <th>Trang thai</th>
+              <th>Thao tac</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className='customer-table-empty'>Đang tải dữ liệu...</td>
+                <td colSpan={6} className='customer-table-empty'>Dang tai du lieu...</td>
               </tr>
             )}
+
             {!loading && customers.length === 0 && (
               <tr>
-                <td colSpan={6} className='customer-table-empty'>Chưa có khách hàng nào.</td>
+                <td colSpan={6} className='customer-table-empty'>Chua co khach hang nao.</td>
               </tr>
             )}
-            {!loading &&
-              customers.map((customer) => (
-                <tr key={customer.id}>
-                  <td>{customer.name}</td>
-                  <td>{customer.email}</td>
-                  <td>
-                    {customer.createdAt
-                      ? new Date(customer.createdAt).toLocaleString('vi-VN')
-                      : 'Không xác định'}
-                  </td>
-                  <td>
-                    <select
-                      className='customer-role-select'
-                      value={customer.role}
-                      onChange={(event) => updateRole(customer, event.target.value)}
-                      disabled={
-                        updatingId === customer.id ||
-                        (customer.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL
-                      }
-                    >
-                      <option value='customer'>{roleDictionary.customer}</option>
-                      <option value='admin'>{roleDictionary.admin}</option>
-                    </select>
-                    {(customer.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL && (
-                      <p className='customer-note'>Tài khoản quản trị mặc định</p>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`customer-status status-${customer.status}`}>
-                      {statusDictionary[customer.status] || customer.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      type='button'
-                      onClick={() => toggleStatus(customer)}
-                      disabled={
-                        updatingId === customer.id ||
-                        (customer.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL
-                      }
-                    >
-                      {customer.status === 'active' ? 'Khoá' : 'Mở khoá'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+
+            {!loading && customers.map((customer) => (
+              <tr key={customer.id}>
+                <td>{customer.name}</td>
+                <td>{customer.email}</td>
+                <td>
+                  {customer.createdAt
+                    ? new Date(customer.createdAt).toLocaleString('vi-VN')
+                    : 'Khong xac dinh'}
+                </td>
+                <td>
+                  <select
+                    className='customer-role-select'
+                    value={customer.role}
+                    onChange={(event) => handleUpdateRole(customer, event.target.value)}
+                    disabled={
+                      updatingId === customer.id ||
+                      (customer.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL
+                    }
+                  >
+                    <option value='customer'>{roleDictionary.customer}</option>
+                    <option value='admin'>{roleDictionary.admin}</option>
+                  </select>
+                  {(customer.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL && (
+                    <p className='customer-note'>Tai khoan quan tri mac dinh</p>
+                  )}
+                </td>
+                <td>
+                  <span className={`customer-status status-${customer.status}`}>
+                    {statusDictionary[customer.status] || customer.status}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    type='button'
+                    onClick={() => handleToggleStatus(customer)}
+                    disabled={
+                      updatingId === customer.id ||
+                      (customer.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL
+                    }
+                  >
+                    {customer.status === 'active' ? 'Khoa' : 'Mo khoa'}
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

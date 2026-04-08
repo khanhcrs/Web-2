@@ -1,134 +1,136 @@
-import React, { useState, useEffect } from 'react';
-import './PriceManagement.css';
-import { API_BASE_URL } from '../../config';
-import { adminFetch } from '../../lib/adminApi';
+import React, { useEffect, useState } from 'react'
+import './PriceManagement.css'
+import { listProducts } from '../../services/productService'
+import { updateProfitMargin } from '../../services/pricingService'
 
 const PriceManagement = () => {
-    const [products, setProducts] = useState([]);
-    const [editingId, setEditingId] = useState(null);
-    const [tempMargin, setTempMargin] = useState('');
+  const [products, setProducts] = useState([])
+  const [editingId, setEditingId] = useState(null)
+  const [tempMargin, setTempMargin] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-    const fetchProducts = async () => {
-        try {
-            const res = await adminFetch(`${API_BASE_URL}/allproducts`);
-            const data = await res.json();
-            setProducts(data);
-        } catch (error) {
-            console.error("Lỗi tải danh sách sản phẩm:", error);
-        }
-    };
+  const fetchProducts = async () => {
+    setLoading(true)
+    setError('')
 
-    useEffect(() => {
-        fetchProducts();
-    }, []);
+    try {
+      const data = await listProducts()
+      setProducts(data)
+    } catch (fetchError) {
+      console.error('Loi tai danh sach san pham:', fetchError)
+      setProducts([])
+      setError(fetchError.message || 'Khong the tai danh sach san pham.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    // Bật chế độ sửa cho 1 dòng
-    const handleEditClick = (product) => {
-        setEditingId(product.id);
-        setTempMargin(product.profit_margin || 0);
-    };
+  useEffect(() => {
+    fetchProducts()
+  }, [])
 
-    // Hủy sửa
-    const handleCancelClick = () => {
-        setEditingId(null);
-        setTempMargin('');
-    };
+  const handleEditClick = (product) => {
+    setEditingId(product.id)
+    setTempMargin(product.profit_margin || 0)
+  }
 
-    // Gửi API lưu Tỉ lệ lợi nhuận mới
-    const handleSaveMargin = async (productId) => {
-        try {
-            const res = await adminFetch(`${API_BASE_URL}/update-profit-margin`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId: productId, newProfitMargin: tempMargin })
-            });
-            const data = await res.json();
+  const handleCancelClick = () => {
+    setEditingId(null)
+    setTempMargin('')
+  }
 
-            if (data.success) {
-                alert('Đã cập nhật tỷ lệ lợi nhuận và giá bán thành công!');
-                setEditingId(null);
-                fetchProducts(); // Tải lại bảng để thấy giá bán mới tự nhảy
-            } else {
-                alert('Lỗi cập nhật: ' + data.message);
-            }
-        } catch (error) {
-            console.error('Lỗi kết nối:', error);
-            alert('Không thể kết nối đến máy chủ.');
-        }
-    };
+  const handleSaveMargin = async (productId) => {
+    try {
+      await updateProfitMargin({
+        productId,
+        newProfitMargin: tempMargin
+      })
 
-    return (
-        <div className="price-mgmt-container">
-            <h2 className="price-mgmt-title">Quản lý Giá Bán & Lợi Nhuận</h2>
-            <p className="price-mgmt-subtitle">Điều chỉnh tỷ lệ % lợi nhuận mong muốn. Giá bán sẽ tự động tính dựa trên Giá nhập bình quân.</p>
+      alert('Da cap nhat ty le loi nhuan va gia ban thanh cong!')
+      setEditingId(null)
+      fetchProducts()
+    } catch (saveError) {
+      console.error('Loi ket noi:', saveError)
+      alert(saveError.message || 'Khong the cap nhat ty le loi nhuan.')
+    }
+  }
 
-            <div className="price-card">
-                <div className="price-table-wrapper">
-                    <table className="price-table">
-                        <thead>
-                            <tr>
-                                <th>Mã SP</th>
-                                <th>Tên Sản Phẩm</th>
-                                <th>Tồn Kho</th>
-                                <th>Giá Nhập (Vốn)</th>
-                                <th>Lợi Nhuận (%)</th>
-                                <th>Giá Bán Lẻ</th>
-                                <th>Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {products.map((p) => (
-                                <tr key={p.id}>
-                                    <td>{p.code || `SP${p.id}`}</td>
-                                    <td style={{ fontWeight: '500' }}>{p.name}</td>
-                                    <td>{p.stock_quantity || 0}</td>
-                                    <td style={{ color: '#64748b' }}>
-                                        {Number(p.current_import_price || 0).toLocaleString()} ₫
-                                    </td>
+  return (
+    <div className='price-mgmt-container'>
+      <h2 className='price-mgmt-title'>Quan ly gia ban va loi nhuan</h2>
+      <p className='price-mgmt-subtitle'>Dieu chinh ty le % loi nhuan mong muon. Gia ban se tu dong tinh dua tren gia nhap binh quan.</p>
 
-                                    {/* CỘT TỈ LỆ LỢI NHUẬN (CHO PHÉP SỬA) */}
-                                    <td>
-                                        {editingId === p.id ? (
-                                            <div className="edit-margin-box">
-                                                <input
-                                                    type="number"
-                                                    value={tempMargin}
-                                                    onChange={(e) => setTempMargin(e.target.value)}
-                                                    min="0"
-                                                    className="margin-input"
-                                                />
-                                                <span className="percent-icon">%</span>
-                                            </div>
-                                        ) : (
-                                            <span className="margin-badge">
-                                                {p.profit_margin || 0}%
-                                            </span>
-                                        )}
-                                    </td>
+      {error && <p style={{ color: '#dc2626', fontWeight: 700 }}>{error}</p>}
 
-                                    <td style={{ fontWeight: '700', color: '#10b981' }}>
-                                        {Number(p.new_price || 0).toLocaleString()} ₫
-                                    </td>
+      <div className='price-card'>
+        <div className='price-table-wrapper'>
+          <table className='price-table'>
+            <thead>
+              <tr>
+                <th>Ma SP</th>
+                <th>Ten san pham</th>
+                <th>Ton kho</th>
+                <th>Gia nhap</th>
+                <th>Loi nhuan (%)</th>
+                <th>Gia ban le</th>
+                <th>Thao tac</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={7}>Dang tai du lieu...</td>
+                </tr>
+              )}
 
-                                    {/* NÚT THAO TÁC */}
-                                    <td>
-                                        {editingId === p.id ? (
-                                            <div className="action-buttons">
-                                                <button className="btn-save" onClick={() => handleSaveMargin(p.id)}>Lưu</button>
-                                                <button className="btn-cancel" onClick={handleCancelClick}>Hủy</button>
-                                            </div>
-                                        ) : (
-                                            <button className="btn-edit" onClick={() => handleEditClick(p)}>Cập nhật %</button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+              {!loading && products.map((product) => (
+                <tr key={product.id}>
+                  <td>{product.code || `SP${product.id}`}</td>
+                  <td style={{ fontWeight: '500' }}>{product.name}</td>
+                  <td>{product.stock_quantity || 0}</td>
+                  <td style={{ color: '#64748b' }}>
+                    {Number(product.current_import_price || 0).toLocaleString()} VND
+                  </td>
+                  <td>
+                    {editingId === product.id ? (
+                      <div className='edit-margin-box'>
+                        <input
+                          type='number'
+                          value={tempMargin}
+                          onChange={(event) => setTempMargin(event.target.value)}
+                          min='0'
+                          className='margin-input'
+                        />
+                        <span className='percent-icon'>%</span>
+                      </div>
+                    ) : (
+                      <span className='margin-badge'>
+                        {product.profit_margin || 0}%
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ fontWeight: '700', color: '#10b981' }}>
+                    {Number(product.new_price || 0).toLocaleString()} VND
+                  </td>
+                  <td>
+                    {editingId === product.id ? (
+                      <div className='action-buttons'>
+                        <button className='btn-save' onClick={() => handleSaveMargin(product.id)}>Luu</button>
+                        <button className='btn-cancel' onClick={handleCancelClick}>Huy</button>
+                      </div>
+                    ) : (
+                      <button className='btn-edit' onClick={() => handleEditClick(product)}>Cap nhat %</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-    );
-};
+      </div>
+    </div>
+  )
+}
 
-export default PriceManagement;
+export default PriceManagement

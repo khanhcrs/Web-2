@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 import './ListProduct.css'
 import cross_icon from '../../assets/cross_icon.png'
 import upload_area from '../../assets/upload_area.svg'
-import { API_BASE_URL, resolveImageUrl } from '../../config'
-import { adminFetch } from '../../lib/adminApi'
+import { resolveImageUrl } from '../../config'
+import { listProducts, removeProduct, updateProduct, uploadProductImage } from '../../services/productService'
 
 const normalizeProductImages = (value, fallbackImage = '') => {
   let images = []
@@ -46,10 +46,10 @@ const ListProduct = () => {
 
   const fetchInfo = async () => {
     setLoading(true)
+
     try {
-      const response = await adminFetch(`${API_BASE_URL}/allproducts`)
-      const data = await response.json()
-      setAllProducts(Array.isArray(data) ? data.map(normalizeProduct) : [])
+      const data = await listProducts()
+      setAllProducts(data.map(normalizeProduct))
     } catch (error) {
       console.error(error)
       setAllProducts([])
@@ -62,23 +62,13 @@ const ListProduct = () => {
     fetchInfo()
   }, [])
 
-  const removeProduct = async (id) => {
-    if (!window.confirm('Ban co chac chan muon xoa san pham nay?')) {
+  const handleRemoveProduct = async (productId) => {
+    if (!window.confirm('Ban co chac chan muon xu ly san pham nay?')) {
       return
     }
 
     try {
-      const response = await adminFetch(`${API_BASE_URL}/removeproduct`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      })
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Khong the xoa san pham.')
-      }
-
+      const data = await removeProduct(productId)
       alert(
         data.action === 'hidden'
           ? 'San pham da co lich su nen duoc chuyen sang trang thai an.'
@@ -125,19 +115,7 @@ const ListProduct = () => {
       let finalImages = [...existingImages]
 
       for (const file of newImages) {
-        const formData = new FormData()
-        formData.append('product', file)
-
-        const uploadResponse = await adminFetch(`${API_BASE_URL}/upload`, {
-          method: 'POST',
-          body: formData
-        })
-        const uploadData = await uploadResponse.json()
-
-        if (!uploadResponse.ok || !uploadData.success) {
-          throw new Error(uploadData.message || 'Khong the upload hinh anh.')
-        }
-
+        const uploadData = await uploadProductImage(file)
         finalImages.push(uploadData.image_url)
       }
 
@@ -147,7 +125,7 @@ const ListProduct = () => {
         throw new Error('San pham phai co it nhat 1 hinh anh.')
       }
 
-      const payload = {
+      await updateProduct(editProduct.id, {
         code: editProduct.code || '',
         name: editProduct.name || '',
         category: editProduct.category || 'women',
@@ -157,18 +135,7 @@ const ListProduct = () => {
         status: editProduct.status || 'active',
         description: editProduct.description || '',
         images: finalImages
-      }
-
-      const response = await adminFetch(`${API_BASE_URL}/product/${editProduct.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
       })
-
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Khong the cap nhat san pham.')
-      }
 
       alert('Cap nhat san pham thanh cong!')
       setEditProduct(null)
@@ -202,41 +169,40 @@ const ListProduct = () => {
         <hr />
         {loading && <p>Dang tai du lieu...</p>}
 
-        {!loading &&
-          allProducts.map((product) => (
-            <React.Fragment key={product.id}>
-              <div className='listproduct-format-main listproduct-format'>
+        {!loading && allProducts.map((product) => (
+          <React.Fragment key={product.id}>
+            <div className='listproduct-format-main listproduct-format'>
+              <img
+                src={resolveImageUrl(product.image)}
+                alt={product.name}
+                className='listproduct-product-icon'
+              />
+              <p style={{ fontWeight: 'bold', color: '#475569' }}>{product.code || 'N/A'}</p>
+              <p>{product.name}</p>
+              <p>
+                <span className={`status-badge ${product.status}`}>
+                  {product.status === 'active' ? 'Hien thi' : 'Dang an'}
+                </span>
+              </p>
+              <p style={{ color: '#10b981', fontWeight: 'bold' }}>
+                {Number(product.new_price || 0).toLocaleString()}d
+              </p>
+              <div className='listproduct-actions'>
+                <button className='btn-edit-product' onClick={() => startEdit(product)}>
+                  Sua
+                </button>
                 <img
-                  src={resolveImageUrl(product.image)}
-                  alt={product.name}
-                  className='listproduct-product-icon'
+                  onClick={() => handleRemoveProduct(product.id)}
+                  className='listproduct-remove-icon'
+                  src={cross_icon}
+                  alt='Xoa'
+                  title='Xoa san pham'
                 />
-                <p style={{ fontWeight: 'bold', color: '#475569' }}>{product.code || 'N/A'}</p>
-                <p>{product.name}</p>
-                <p>
-                  <span className={`status-badge ${product.status}`}>
-                    {product.status === 'active' ? 'Hien thi' : 'Dang an'}
-                  </span>
-                </p>
-                <p style={{ color: '#10b981', fontWeight: 'bold' }}>
-                  {Number(product.new_price || 0).toLocaleString()}d
-                </p>
-                <div className='listproduct-actions'>
-                  <button className='btn-edit-product' onClick={() => startEdit(product)}>
-                    Sua
-                  </button>
-                  <img
-                    onClick={() => removeProduct(product.id)}
-                    className='listproduct-remove-icon'
-                    src={cross_icon}
-                    alt='Xoa'
-                    title='Xoa san pham'
-                  />
-                </div>
               </div>
-              <hr />
-            </React.Fragment>
-          ))}
+            </div>
+            <hr />
+          </React.Fragment>
+        ))}
       </div>
 
       {editProduct && (

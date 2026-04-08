@@ -6,12 +6,7 @@ const normalizeBaseUrl = (url) => {
 }
 
 const getDefaultApiBaseUrl = () => {
-  if (typeof window === 'undefined') {
-    return 'http://127.0.0.1:8000'
-  }
-
-  const { protocol, hostname } = window.location
-  return `${protocol}//${hostname}:8000`
+  return '../api'
 }
 
 const DEFAULT_API_BASE_URL = getDefaultApiBaseUrl()

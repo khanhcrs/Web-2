@@ -1,191 +1,166 @@
-import React, { useState } from 'react';
-import './AddProduct.css';
-import upload_area from '../../assets/upload_area.svg';
-import { API_BASE_URL } from '../../config';
-import { adminFetch } from '../../lib/adminApi';
+import React, { useState } from 'react'
+import './AddProduct.css'
+import upload_area from '../../assets/upload_area.svg'
+import { addProduct, uploadProductImage } from '../../services/productService'
+
+const initialState = {
+  code: '',
+  name: '',
+  category: 'women',
+  unit: 'Cai',
+  initial_stock: '',
+  import_price: '',
+  profit_margin: '',
+  old_price: '',
+  status: 'active',
+  description: ''
+}
 
 const AddProduct = () => {
-  const [images, setImages] = useState([]);
-  const [productDetails, setProductDetails] = useState({
-    code: '',
-    name: '',
-    category: 'women',
-    unit: 'Cái',
-    initial_stock: '',
-    import_price: '',
-    profit_margin: '',
-    old_price: '',
-    status: 'active',
-    description: ''
-  });
+  const [images, setImages] = useState([])
+  const [productDetails, setProductDetails] = useState(initialState)
 
-  const imageHandler = (e) => {
-    const files = Array.from(e.target.files || []);
-    setImages(files);
-  };
+  const imageHandler = (event) => {
+    const files = Array.from(event.target.files || [])
+    setImages(files)
+  }
 
-  const changeHandler = (e) => {
-    setProductDetails({ ...productDetails, [e.target.name]: e.target.value });
-  };
+  const changeHandler = (event) => {
+    setProductDetails((prev) => ({ ...prev, [event.target.name]: event.target.value }))
+  }
 
-  const Add_Product = async () => {
+  const handleAddProduct = async () => {
     if (!images.length) {
-      alert('Vui lòng chọn ít nhất một ảnh sản phẩm.');
-      return;
+      alert('Vui long chon it nhat mot anh san pham.')
+      return
     }
+
     if (!productDetails.code || !productDetails.name) {
-      alert('Vui lòng nhập Mã và Tên sản phẩm.');
-      return;
+      alert('Vui long nhap ma va ten san pham.')
+      return
     }
 
     try {
-      const uploadedUrls = [];
+      const uploadedUrls = []
 
       for (const file of images) {
-        const formData = new FormData();
-        formData.append('product', file);
-
-        const uploadResp = await adminFetch(`${API_BASE_URL}/upload`, {
-          method: 'POST',
-          headers: { Accept: 'application/json' },
-          body: formData,
-        });
-
-        const uploadData = await uploadResp.json();
-        if (!uploadData.success) throw new Error('Upload failed');
-        uploadedUrls.push(uploadData.image_url);
+        const uploadData = await uploadProductImage(file)
+        uploadedUrls.push(uploadData.image_url)
       }
 
-      const product = {
+      await addProduct({
         ...productDetails,
         images: uploadedUrls,
-        image: uploadedUrls[0],
-      };
+        image: uploadedUrls[0]
+      })
 
-      const response = await adminFetch(`${API_BASE_URL}/addproduct`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(product),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        alert('✅ Đã thêm sản phẩm thành công!');
-        // Reset form
-        setProductDetails({
-          code: '', name: '', category: 'women', unit: 'Cái', initial_stock: '', import_price: '', profit_margin: '', old_price: '', status: 'active', description: ''
-        });
-        setImages([]);
-      } else {
-        alert(`❌ Lỗi: ${data.message}`);
-      }
+      alert('Da them san pham thanh cong!')
+      setProductDetails(initialState)
+      setImages([])
     } catch (error) {
-      console.error('Add product failed:', error);
-      alert('❌ Không thể thêm sản phẩm. Vui lòng kiểm tra lại server.');
+      console.error('Add product failed:', error)
+      alert(error.message || 'Khong the them san pham.')
     }
-  };
+  }
 
   return (
-    <div className="add-product">
-      <h2 style={{ marginBottom: '20px', color: '#1e293b' }}>Thêm Sản Phẩm Mới</h2>
+    <div className='add-product'>
+      <h2 style={{ marginBottom: '20px', color: '#1e293b' }}>Them san pham moi</h2>
 
-      <div className="addproduct-grid">
-        <div className="addproduct-itemfield">
-          <p>Mã Sản Phẩm (*)</p>
-          <input value={productDetails.code} onChange={changeHandler} type="text" name="code" placeholder="VD: SP001" />
+      <div className='addproduct-grid'>
+        <div className='addproduct-itemfield'>
+          <p>Ma san pham (*)</p>
+          <input value={productDetails.code} onChange={changeHandler} type='text' name='code' placeholder='VD: SP001' />
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Tên Sản Phẩm (*)</p>
-          <input value={productDetails.name} onChange={changeHandler} type="text" name="name" placeholder="Nhập tên sản phẩm" />
+        <div className='addproduct-itemfield'>
+          <p>Ten san pham (*)</p>
+          <input value={productDetails.name} onChange={changeHandler} type='text' name='name' placeholder='Nhap ten san pham' />
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Danh Mục</p>
-          <select value={productDetails.category} onChange={changeHandler} name="category" className="add-product-selector">
-            <option value="women">Phụ Nữ</option>
-            <option value="men">Đàn Ông</option>
-            <option value="kid">Trẻ Em</option>
+        <div className='addproduct-itemfield'>
+          <p>Danh muc</p>
+          <select value={productDetails.category} onChange={changeHandler} name='category' className='add-product-selector'>
+            <option value='women'>Phu nu</option>
+            <option value='men'>Dan ong</option>
+            <option value='kid'>Tre em</option>
           </select>
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Đơn Vị Tính</p>
-          <select value={productDetails.unit} onChange={changeHandler} name="unit" className="add-product-selector">
-            <option value="Cái">Cái</option>
-            <option value="Bộ">Bộ</option>
-            <option value="Chiếc">Chiếc</option>
-            <option value="Đôi">Đôi</option>
+        <div className='addproduct-itemfield'>
+          <p>Don vi tinh</p>
+          <select value={productDetails.unit} onChange={changeHandler} name='unit' className='add-product-selector'>
+            <option value='Cai'>Cai</option>
+            <option value='Bo'>Bo</option>
+            <option value='Chiec'>Chiec</option>
+            <option value='Doi'>Doi</option>
           </select>
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Số Lượng Ban Đầu</p>
-          <input value={productDetails.initial_stock} onChange={changeHandler} type="number" name="initial_stock" placeholder="0" min="0" />
+        <div className='addproduct-itemfield'>
+          <p>So luong ban dau</p>
+          <input value={productDetails.initial_stock} onChange={changeHandler} type='number' name='initial_stock' placeholder='0' min='0' />
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Giá Nhập Ban Đầu (₫)</p>
-          <input value={productDetails.import_price} onChange={changeHandler} type="number" name="import_price" placeholder="0" min="0" />
+        <div className='addproduct-itemfield'>
+          <p>Gia nhap ban dau (VND)</p>
+          <input value={productDetails.import_price} onChange={changeHandler} type='number' name='import_price' placeholder='0' min='0' />
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Tỉ Lệ Lợi Nhuận (%)</p>
-          <input value={productDetails.profit_margin} onChange={changeHandler} type="number" name="profit_margin" placeholder="VD: 30" min="0" />
+        <div className='addproduct-itemfield'>
+          <p>Ty le loi nhuan (%)</p>
+          <input value={productDetails.profit_margin} onChange={changeHandler} type='number' name='profit_margin' placeholder='VD: 30' min='0' />
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Giá Cũ (Gạch bỏ trên web)</p>
-          <input value={productDetails.old_price} onChange={changeHandler} type="number" name="old_price" placeholder="0" min="0" />
+        <div className='addproduct-itemfield'>
+          <p>Gia cu</p>
+          <input value={productDetails.old_price} onChange={changeHandler} type='number' name='old_price' placeholder='0' min='0' />
         </div>
 
-        <div className="addproduct-itemfield">
-          <p>Trạng Thái</p>
-          <select value={productDetails.status} onChange={changeHandler} name="status" className="add-product-selector" style={{ fontWeight: 'bold', color: productDetails.status === 'active' ? '#10b981' : '#ef4444' }}>
-            <option value="active">Hiển thị (Đang bán)</option>
-            <option value="hidden">Ẩn (Không bán)</option>
+        <div className='addproduct-itemfield'>
+          <p>Trang thai</p>
+          <select value={productDetails.status} onChange={changeHandler} name='status' className='add-product-selector' style={{ fontWeight: 'bold', color: productDetails.status === 'active' ? '#10b981' : '#ef4444' }}>
+            <option value='active'>Hien thi</option>
+            <option value='hidden'>An</option>
           </select>
         </div>
       </div>
 
-      <div className="addproduct-itemfield" style={{ marginTop: '15px' }}>
-        <p>Mô Tả Sản Phẩm</p>
+      <div className='addproduct-itemfield' style={{ marginTop: '15px' }}>
+        <p>Mo ta san pham</p>
         <textarea
           value={productDetails.description}
           onChange={changeHandler}
-          name="description"
-          placeholder="Nhập mô tả chi tiết sản phẩm..."
-          rows="4"
+          name='description'
+          placeholder='Nhap mo ta chi tiet san pham...'
+          rows='4'
           style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontFamily: 'inherit' }}
         />
       </div>
 
-      <div className="addproduct-itemfield" style={{ marginTop: '15px' }}>
-        <p>Hình Ảnh Sản Phẩm (*)</p>
-        <label htmlFor="file-input">
-          <div className="addproduct-thumnail-img">
+      <div className='addproduct-itemfield' style={{ marginTop: '15px' }}>
+        <p>Hinh anh san pham (*)</p>
+        <label htmlFor='file-input'>
+          <div className='addproduct-thumnail-img'>
             {images.length ? (
-              <div className="addproduct-image-preview">
+              <div className='addproduct-image-preview'>
                 {images.map((file, index) => (
-                  <img key={file.name + index} src={URL.createObjectURL(file)} alt="Preview" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', marginRight: '10px' }} />
+                  <img key={file.name + index} src={URL.createObjectURL(file)} alt='Preview' style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', marginRight: '10px' }} />
                 ))}
               </div>
             ) : (
-              <img src={upload_area} alt="Upload placeholder" />
+              <img src={upload_area} alt='Upload placeholder' />
             )}
           </div>
         </label>
-        <input onChange={imageHandler} type="file" multiple name="image" id="file-input" hidden />
+        <input onChange={imageHandler} type='file' multiple name='image' id='file-input' hidden />
       </div>
 
-      <button onClick={Add_Product} className="addproduct-btn">
-        THÊM SẢN PHẨM
+      <button onClick={handleAddProduct} className='addproduct-btn'>
+        THEM SAN PHAM
       </button>
     </div>
-  );
-};
+  )
+}
 
-export default AddProduct;
+export default AddProduct

@@ -11,7 +11,7 @@ import { AuthContext } from '../../Context/AuthContext'
 const Navbar = () => {
     const [menu, setMenu] = useState("Cửa hàng")
     const [showSuggestions, setShowSuggestions] = useState(false)
-    const { getTotalCartItems, products, searchTerm, setSearchTerm } = useContext(ShopContext);
+    const { getCartLineCount, products, searchTerm, setSearchTerm } = useContext(ShopContext);
     const menuRef = useRef();
     const suggestionRef = useRef(null)
     const navigate = useNavigate();
@@ -145,7 +145,7 @@ const Navbar = () => {
                     )}
                     <Link to='/cart' className="nav-cart-link">
                         <img src={cart_icon} alt='Cart' />
-                        <div className="nav-cart-count">{getTotalCartItems()}</div>
+                        <div className="nav-cart-count">{getCartLineCount()}</div>
                     </Link>
                 </div>
             </div>

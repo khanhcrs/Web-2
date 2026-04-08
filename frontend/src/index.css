@@ -1,5 +1,6 @@
 * {
   margin: 0;
+  box-sizing: border-box;
 }
 
 body {
@@ -9,7 +10,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-family: Times New Roman;
+  color: #111827;
+  background: #ffffff;
 }
 
 .product-page-loading {

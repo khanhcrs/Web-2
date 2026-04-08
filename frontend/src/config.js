@@ -6,12 +6,7 @@ const normalizeBaseUrl = (url) => {
 }
 
 const getDefaultApiBaseUrl = () => {
-  if (typeof window === 'undefined') {
-    return 'http://127.0.0.1:8000'
-  }
-
-  const { protocol, hostname } = window.location
-  return `${protocol}//${hostname}:8000`
+  return '../api'
 }
 
 const DEFAULT_API_BASE_URL = getDefaultApiBaseUrl()
@@ -21,12 +16,7 @@ export const API_BASE_URL = normalizeBaseUrl(
 )
 
 const getDefaultAdminPortalUrl = () => {
-  if (typeof window === 'undefined') {
-    return '/admin'
-  }
-
-  const { protocol, hostname } = window.location
-  return `${protocol}//${hostname}:5173`
+  return '../admin'
 }
 
 export const ADMIN_PORTAL_URL = normalizeBaseUrl(
@@ -35,11 +25,28 @@ export const ADMIN_PORTAL_URL = normalizeBaseUrl(
 
 const isAbsoluteUrl = (url) => /^https?:\/\//i.test(url)
 
+const isFrontendStaticAssetPath = (url) => {
+  if (!url) {
+    return false
+  }
+
+  return (
+    url.startsWith('/static/') ||
+    url.startsWith('static/') ||
+    url.startsWith('./static/') ||
+    url.includes('/static/media/') ||
+    url.includes('static/media/')
+  )
+}
+
 export const resolveImageUrl = (imagePath) => {
   if (!imagePath) {
     return ''
   }
   if (isAbsoluteUrl(imagePath)) {
+    return imagePath
+  }
+  if (isFrontendStaticAssetPath(imagePath)) {
     return imagePath
   }
   if (imagePath.startsWith('/assets/')) {

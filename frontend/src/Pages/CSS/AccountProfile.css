@@ -34,6 +34,21 @@
   color: #313131;
 }
 
+.account-profile-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.account-profile-orders-link {
+  color: #ef4444;
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .account-profile-order-box {
   border-top: 1px solid #d7d7d7;
 }
@@ -59,6 +74,23 @@
   padding: 22px;
   font-size: 34px;
   color: #333;
+}
+
+.account-profile-order-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.3fr 1.5fr 1.6fr;
+  gap: 18px;
+  padding: 18px 22px;
+  border: 1px solid #d9d9d9;
+  border-top: 0;
+  text-decoration: none;
+  color: #333;
+  background: #fff;
+  font-size: 22px;
+}
+
+.account-profile-order-row:hover {
+  background: #fafafa;
 }
 
 .account-profile-sidebar {
@@ -117,10 +149,15 @@
   .account-profile-greeting,
   .account-profile-order-header,
   .account-profile-empty-order,
+  .account-profile-order-row,
   .account-profile-side-title,
   .account-profile-side-name,
   .account-profile-btn {
     font-size: 20px;
+  }
+
+  .account-profile-orders-link {
+    font-size: 15px;
   }
 }
 
@@ -231,6 +268,17 @@
 }
 
 @media (max-width: 768px) {
+  .account-profile-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-profile-order-header,
+  .account-profile-order-row {
+    grid-template-columns: 1fr;
+    font-size: 16px;
+  }
+
   .account-address-form-row {
     grid-template-columns: 1fr;
   }

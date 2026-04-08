@@ -1,8 +1,9 @@
 import React, { useContext, useState } from 'react'
 import './CSS/LoginSignup.css'
-import { ADMIN_PORTAL_URL, API_BASE_URL } from '../config'
+import { ADMIN_PORTAL_URL } from '../config'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../Context/AuthContext'
+import { loginUser, registerUser } from '../services/authService'
 
 const LoginSignup = () => {
   const [mode, setMode] = useState('signup')
@@ -12,7 +13,6 @@ const LoginSignup = () => {
   const [success, setSuccess] = useState('')
   const navigate = useNavigate()
   const { login: authenticate } = useContext(AuthContext)
-
 
   const toggleMode = () => {
     setMode((prev) => (prev === 'signup' ? 'login' : 'signup'))
@@ -30,47 +30,44 @@ const LoginSignup = () => {
     setLoading(true)
     setError('')
     setSuccess('')
+
     try {
-      const endpoint = mode === 'signup' ? 'register' : 'login'
       const payload = {
         email: form.email,
         password: form.password
       }
+
       if (mode === 'signup') {
         payload.name = form.name
       }
 
-      const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Không thể xử lý yêu cầu.')
-      }
+      const data = mode === 'signup'
+        ? await registerUser(payload)
+        : await loginUser(payload)
 
       if (mode === 'signup') {
-        setSuccess('Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.')
+        setSuccess('Dang ky thanh cong. Ban co the dang nhap ngay bay gio.')
         setForm({ name: '', email: '', password: '' })
         setMode('login')
-      } else if (data.token && data.user) {
+        return
+      }
+
+      if (data.token && data.user) {
         authenticate(data.token, data.user)
+
         if (data.user.role === 'admin') {
-          const adminUrl = new URL(ADMIN_PORTAL_URL || '/admin', window.location.origin)
+          const adminUrl = new URL(ADMIN_PORTAL_URL || '../admin', window.location.href)
           adminUrl.pathname = `${adminUrl.pathname.replace(/\/$/, '')}/login`
           adminUrl.searchParams.set('token', data.token)
           adminUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(data.user)))
           window.location.href = adminUrl.toString()
-        } else {
-          navigate('/', { replace: true })
+          return
         }
+
+        navigate('/', { replace: true })
       }
-    } catch (err) {
-      setError(err.message)
+    } catch (submitError) {
+      setError(submitError.message || 'Khong the xu ly yeu cau.')
     } finally {
       setLoading(false)
     }
@@ -79,13 +76,13 @@ const LoginSignup = () => {
   return (
     <div className='loginsignup'>
       <div className='loginsignup-container'>
-        <h1>{mode === 'signup' ? 'Đăng ký' : 'Đăng nhập'}</h1>
+        <h1>{mode === 'signup' ? 'Dang ky' : 'Dang nhap'}</h1>
         <form className='loginsignup-fields' onSubmit={handleSubmit}>
           {mode === 'signup' && (
             <input
               type='text'
               name='name'
-              placeholder='Họ và tên'
+              placeholder='Ho va ten'
               value={form.name}
               onChange={handleChange}
               required
@@ -94,7 +91,7 @@ const LoginSignup = () => {
           <input
             type='email'
             name='email'
-            placeholder='Địa chỉ email'
+            placeholder='Dia chi email'
             value={form.email}
             onChange={handleChange}
             required
@@ -102,26 +99,23 @@ const LoginSignup = () => {
           <input
             type='password'
             name='password'
-            placeholder='Mật khẩu'
+            placeholder='Mat khau'
             value={form.password}
             onChange={handleChange}
             required
           />
           <button type='submit' disabled={loading}>
-            {loading ? 'Đang xử lý...' : mode === 'signup' ? 'Tiếp tục' : 'Đăng nhập'}
+            {loading ? 'Dang xu ly...' : mode === 'signup' ? 'Tiep tuc' : 'Dang nhap'}
           </button>
         </form>
         {error && <p className='loginsignup-message error'>{error}</p>}
         {success && <p className='loginsignup-message success'>{success}</p>}
         <p className='loginsignup-login'>
-          {mode === 'signup'
-            ? 'Đã có tài khoản?'
-            : 'Chưa có tài khoản?'}{' '}
+          {mode === 'signup' ? 'Da co tai khoan?' : 'Chua co tai khoan?'}{' '}
           <span onClick={toggleMode}>
-            {mode === 'signup' ? 'Đăng nhập ngay' : 'Đăng ký ngay'}
+            {mode === 'signup' ? 'Dang nhap ngay' : 'Dang ky ngay'}
           </span>
         </p>
-      
       </div>
     </div>
   )
